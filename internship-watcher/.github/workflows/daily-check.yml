@@ -1,0 +1,44 @@
+name: Daily Role Check
+
+"on":
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check-roles:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # Set via Settings -> Secrets and variables -> Actions -> Variables
+          # in this repo. Left unset, scrape.py runs every registered
+          # scraper. See README.md for how to set this.
+          ENABLED_COMPANIES: ${{ vars.ENABLED_COMPANIES }}
+        run: python scrape.py
+
+      - name: Commit updated role files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add seen_jobs.json roles.json open_roles.md
+          git commit -m "Update open roles" || echo "No changes to commit"
+          git push
