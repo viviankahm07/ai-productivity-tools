@@ -1,0 +1,66 @@
+# Cover Letter Generation Instructions
+
+<!--
+Copy this file to instructions.md (already git-ignored) and fill in your
+own details. This file is read by the Planner, Generator, and Reviewer
+agents to guide their output — the structure below mirrors what those
+agents expect, with placeholders instead of real personal info.
+-->
+
+These are the fixed rules for generating [Your Name]'s cover letters. Follow this structure exactly every time, filling in only the bracketed/company-specific sections.
+
+## Formatting
+
+- **Header** (top):
+  - Name: **[Your Full Name]** — 15pt, Times New Roman — **centered**
+  - Contact line: [City, State] | [Phone] | [Email] | [LinkedIn URL] | [GitHub URL] | [Portfolio URL] — 11pt, Times New Roman — **centered**
+  - LinkedIn, GitHub, and Portfolio should be hyperlinked but styled in **black text**, not the default blue hyperlink color
+  - Everything from the date onward (date, role name, salutation, body, closing) is **left-aligned**
+- **All body text**: 11pt, Times New Roman
+- **Top left, above the salutation**:
+  - Date (the date the letter is generated/requested)
+  - Name of the role, on the line underneath the date
+
+## Delivery
+
+- Once the letter is created, save it as a .docx file and return it directly to [Your Name] in the conversation so they can review and upload it themselves.
+- Do **not** upload or save the file to Google Drive.
+
+## Structure
+
+### 1. Salutation
+```
+Dear Recruiter,
+```
+
+### 2. Opening paragraph (fixed — do not alter wording)
+```
+My name is [Your Name], and I am writing to express my interest in the [Role Name] at [Firm Name]. I am currently [studying/working as] [your field/role] at [your school/company], with a strong focus on [your key strengths/focus areas]. I believe the following skills make me a strong fit for this program.
+```
+
+### 3. Three skill paragraphs
+- Each formatted as an indented bullet point
+- Each has a **bolded header/title** (e.g., **[Skill Area]:**) followed by the paragraph content
+- Content should be pulled from [Your Name]'s past cover letters and background ([list your key experiences — internships, projects, research, coursework]) and tailored to match the specific role's requirements
+- Refer to [Your Name]'s past example letters for tone, phrasing style, and level of detail
+
+### 4. Company-specific paragraph (fixed template — fill in brackets only)
+```
+As for my interest in [Firm Name], it is deeply rooted in the firm's ability to [specific detail about the firm — e.g., a strategy, technology, market position, or approach]. [One to two sentences expanding on this detail]. I am enthusiastic about the possibility of bringing my skills to [Firm Name] and look forward to discussing how my background and experience would allow me to contribute to the [Team Name] team.
+```
+
+**Research requirements for this paragraph:**
+- Pull specific, concrete details about the firm — not generic language like "innovation" or "excellence"
+- Prioritize details about: the firm's specific business strategy, market position or technology, and either **firm values** or **[any group-specific programs/initiatives relevant to you]** — at least one of these two should be included
+- Search the firm's official site, press releases, and recent news for this content
+
+### 5. Closing
+```
+Sincerely,
+
+[Your Name]
+```
+
+## Source Material
+- Reference [Your Name]'s past cover letters (stored in this project) for tone, sentence rhythm, and how they typically frame their experience within the three skill paragraphs
+- Do not invent experience — only draw from what appears in [Your Name]'s actual background/past letters/resume
