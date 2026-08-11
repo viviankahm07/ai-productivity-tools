@@ -1,0 +1,90 @@
+# **JORDAN ALEX RIVERA**
+
+Anytown, ST **|** +1 (555) 555-0100 **|** jordan.rivera@example.edu | LinkedIn | GitHub | Portfolio
+
+## **EDUCATION**
+
+**EXAMPLE STATE UNIVERSITY**
+
+**College of Engineering — GPA:** 3.80 | **ACT:** 34
+_Bachelor of Science, Computer Science Expected Graduation: May 2028_
+
+**COURSEWORK:** Data Structures & Algorithms, Discrete Math, Linear Algebra, Probability & Statistics
+
+## **TECHNICAL SKILLS**
+
+**LANGUAGES:** Python, Java, C++
+
+**LIBRARIES & TOOLS:** Git, Docker, SQL, AWS, NumPy, Pandas, Scikit-learn, PyTorch, Flask, React
+
+**PROGRAMS:** Example Corp Software Certificate, Example Capital Trading Challenge (Summer 2026)
+
+## **PROFESSIONAL EXPERIENCE**
+
+### **EXAMPLE TECH CO.**
+
+- _SOFTWARE ENGINEERING INTERN_
+
+**Remote** _May 2026 - Present_
+
+- Built an end-to-end integration enabling data ingestion across three third-party platforms
+- Developed backend services for request handling, webhook processing, and usage-quota enforcement
+- Designed a scalable system supporting plan limits, deferred processing, and billing top-ups
+- Engineered cloud workflows to persist metadata and processing state
+
+### **SAMPLE ANALYTICS INC.**
+
+- _SOFTWARE ENGINEERING INTERN_
+
+**Anytown, ST** _May 2026 - Present_
+
+- Built an internal QA platform using an agentic workflow to test a suite of frontend and backend features
+- Designed agents for test planning, automation, and defect detection
+- Implemented human approval gates to validate AI-generated outputs before execution
+- Integrated findings aggregation with CI tooling to surface failures and deliver reports
+
+## **PROJECTS**
+
+- **EXAMPLE PRODUCTIVITY SUITE Anytown, ST**
+
+### _(PYTHON, REACT/NEXT.JS, OPENAI API, ANTHROPIC API, GITHUB ACTIONS)_
+
+- Built a sample email-review tool that analyzes message context, tone, and clarity
+- Developed an agentic cover-letter generator orchestrating multiple agents to incorporate job descriptions into drafts
+- Engineered an automated internship watcher using GitHub Actions to monitor career pages and send alerts
+
+### **SAMPLE CLASSIFIER MACHINE LEARNING MODEL**
+
+**Anytown, ST**
+
+- _(PYTHON, OPENCV, SCIKIT-LEARN, NUMPY, PANDAS)_
+
+- Built a computer vision pipeline using pose estimation and feature engineering to classify a set of poses
+- Designed data preprocessing and augmentation strategies to generalize the dataset
+- Evaluated a variety of models using train/validation splits and standard classification metrics
+
+**COMPILER FOR SAMPLE SCHEDULER Anytown, ST** _(PYTHON, CUDA, NCCL)_
+
+- Built a compiler to translate sample schedules into CUDA code, improving distributed op performance
+- Extended the scheduling framework to support varying cluster sizes
+- Developed a smoke test to identify underperforming nodes by comparing device-level execution speed
+
+## **EXTRACURRICULARS & LEADERSHIP**
+
+### **EXAMPLE UNIVERSITY DATA SCIENCE PROJECT TEAM**
+
+- _SUBTEAM MEMBER_
+
+**Anytown, ST** _Feb 2026 - Present_
+
+- Completed new-member education in data engineering, machine learning, and full-stack development
+- Explored subteam-specific topics such as trading, pricing, and statistical arbitrage
+- Built machine learning models using technical indicators and time-series cross-validation
+
+**EXAMPLE UNIVERSITY BUSINESS SOCIETY — DIVERSITY, EQUITY, AND INCLUSION CHAIR**
+
+**EXAMPLE UNIVERSITY FINANCIAL ANALYSTS — SOFTWARE & SEMICONDUCTORS ANALYST**
+
+**SAMPLE CAMPUS DANCE GROUP — MEMBER**
+
+_Sep 2025 - Present_

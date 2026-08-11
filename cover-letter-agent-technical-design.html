@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cover Letter Agent — Technical Design</title>
+  <style>
+    :root {
+      --rose: #2f80ed;
+      --rose-2: #5b9bf2;
+      --pink: #9fc4f7;
+      --light-pink: #e8f2ff;
+      --pale-pink: #f5f9ff;
+      --sage: #12a150;
+      --sage-2: #4fbf7d;
+      --light-sage: #e6f7ed;
+      --ink: #172033;
+      --muted: #617083;
+      --line: #d9e4f2;
+      --card: #fff;
+      --bg: #f3f7fb;
+      --code-bg: #0b1628;
+      --green: #12a150;
+      --amber: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      min-height: 100vh
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 28px 22px;
+      background: linear-gradient(180deg, var(--rose), #07182b);
+      color: #fff
+    }
+
+    .brand {
+      font-weight: 800;
+      font-size: 18px;
+      margin-bottom: 4px
+    }
+
+    .brand-subtitle {
+      color: #f1d4dc;
+      font-size: 12px;
+      margin-bottom: 24px
+    }
+
+    nav a {
+      display: block;
+      color: #f6dfe4;
+      text-decoration: none;
+      padding: 8px 10px;
+      margin: 2px 0;
+      border-radius: 8px;
+      font-size: 13px
+    }
+
+    nav a:hover {
+      background: rgba(255, 255, 255, .13);
+      color: #fff
+    }
+
+    nav .nav-group {
+      color: #d8a9b6;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 800;
+      margin: 16px 10px 4px
+    }
+
+    main {
+      width: 100%;
+      max-width: 1180px;
+      padding: 36px 42px 72px
+    }
+
+    .hero {
+      padding: 44px 48px;
+      background: radial-gradient(circle at top right, rgba(47, 128, 237, .24), transparent 34%), linear-gradient(135deg, var(--rose), #173b63);
+      color: #fff;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(15, 39, 68, .24);
+      margin-bottom: 28px
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .16);
+      color: #fdeff2;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 16px
+    }
+
+    h1 {
+      font-size: 40px;
+      line-height: 1.06;
+      margin: 0 0 12px;
+      letter-spacing: -.03em
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: #fbeaee;
+      margin: 0 0 16px;
+      max-width: 880px
+    }
+
+    .hero-note {
+      margin: 0;
+      color: #f0d9de;
+      max-width: 900px
+    }
+
+    .section-card {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 30px;
+      margin: 22px 0;
+      box-shadow: 0 12px 28px rgba(20, 45, 70, .06);
+      overflow: visible
+    }
+
+    .section-card h2 {
+      color: var(--rose);
+      margin: 0 0 16px;
+      font-size: 26px;
+      letter-spacing: -.02em;
+      line-height: 1.2
+    }
+
+    .section-card h3 {
+      color: var(--rose);
+      margin: 24px 0 10px;
+      font-size: 19px;
+      letter-spacing: -.01em
+    }
+
+    .section-card h4 {
+      color: var(--rose);
+      margin: 18px 0 6px;
+      font-size: 15px
+    }
+
+    .section-card p {
+      margin: 0 0 14px;
+      color: #4a3b41
+    }
+
+    .section-kicker {
+      color: var(--sage);
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      margin-bottom: 8px
+    }
+
+    .callout-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin: 20px 0 4px
+    }
+
+    .callout {
+      background: var(--pale-pink);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px
+    }
+
+    .callout .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .06em
+    }
+
+    .callout .value {
+      color: var(--rose);
+      font-weight: 800;
+      font-size: 17px;
+      margin-top: 4px
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 18px 0 6px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px
+    }
+
+    th {
+      background: var(--rose);
+      color: #fff;
+      text-align: left;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.35;
+      vertical-align: top
+    }
+
+    td {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      font-size: 13px;
+      line-height: 1.44;
+      overflow-wrap: break-word
+    }
+
+    tr:nth-child(even) td {
+      background: var(--pale-pink)
+    }
+
+    code {
+      background: var(--light-sage);
+      color: var(--sage);
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 12.5px;
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace
+    }
+
+    .code-block {
+      background: var(--code-bg);
+      color: #f6e9ec;
+      padding: 22px;
+      border-radius: 16px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      border: 1px solid rgba(255, 255, 255, .1);
+      white-space: pre
+    }
+
+    .code-block code {
+      background: none;
+      color: inherit;
+      padding: 0
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 18px
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: flex-start;
+      background: var(--pale-pink);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 13px 15px
+    }
+
+    .flow-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: var(--sage);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 13px
+    }
+
+    .flow-title {
+      font-weight: 800;
+      color: var(--rose);
+      margin-bottom: 2px
+    }
+
+    .flow-desc {
+      color: #5a4750;
+      font-size: 13px
+    }
+
+    .check-list {
+      list-style: none;
+      margin: 16px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 10px
+    }
+
+    .check-list li {
+      position: relative;
+      padding: 12px 14px 12px 42px;
+      background: var(--light-sage);
+      border: 1px solid var(--line);
+      border-radius: 12px
+    }
+
+    .check-list li::before {
+      content: "\2713";
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--sage);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 12px
+    }
+
+    .non-goal-list li::before {
+      content: "\2013";
+      background: var(--pink)
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px
+    }
+
+    .arch-box {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fff, #fdf8f7);
+      padding: 18px
+    }
+
+    .arch-box h3 {
+      margin-top: 0
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--light-sage);
+      color: var(--sage);
+      font-weight: 800;
+      padding: 5px 10px;
+      border-radius: 8px;
+      margin: 4px 6px 4px 0;
+      font-size: 13px
+    }
+
+    .why-box {
+      background: linear-gradient(180deg, #f2f6ef, #eef3ea);
+      border: 1px solid #cfe0c7;
+      border-left: 4px solid var(--sage);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin: 14px 0
+    }
+
+    .why-box .why-label {
+      display: inline-block;
+      color: #3f5539;
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: .08em;
+      margin-bottom: 8px
+    }
+
+    .why-box p {
+      margin: 0 0 8px;
+      color: #33452e
+    }
+
+    .why-box p:last-child {
+      margin-bottom: 0
+    }
+
+    .diagram {
+      background: var(--pale-pink);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      margin: 20px 0;
+      overflow-x: auto
+    }
+
+    .diagram pre.mermaid {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
+      text-align: center
+    }
+
+    .diagram pre.mermaid:not([data-processed]) {
+      color: var(--muted);
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+      font-size: 12px
+    }
+
+    .diagram .cap {
+      color: var(--muted);
+      font-size: 12.5px;
+      margin-top: 10px;
+      text-align: center
+    }
+
+    .pill {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 3px 10px;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 8px
+    }
+
+    .pill-core {
+      background: var(--light-sage);
+      color: #3f5539
+    }
+
+    .pill-future {
+      background: var(--light-pink);
+      color: var(--rose)
+    }
+
+    .note-inline {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    td ul.cell-list {
+      margin: 0;
+      padding-left: 16px;
+      list-style: disc
+    }
+
+    td ul.cell-list li {
+      margin: 0 0 6px
+    }
+
+    td ul.cell-list li:last-child {
+      margin-bottom: 0
+    }
+
+    td ul.cell-list li>strong {
+      color: var(--rose)
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap
+    }
+
+    .tag-planner {
+      background: #f3e3e8;
+      color: #7d3b52
+    }
+
+    .tag-generator {
+      background: #eef3ea;
+      color: #5f7a5b
+    }
+
+    .tag-reviewer {
+      background: #fdeccb;
+      color: #92600a
+    }
+
+    @media(max-width:980px) {
+      .layout {
+        display: block
+      }
+
+      aside {
+        position: relative;
+        height: auto
+      }
+
+      main {
+        padding: 22px
+      }
+
+      h1 {
+        font-size: 30px
+      }
+
+      .callout-grid,
+      .two-col {
+        grid-template-columns: 1fr
+      }
+    }
+
+    @media print {
+      body {
+        background: white
+      }
+
+      .layout {
+        display: block
+      }
+
+      aside {
+        display: none
+      }
+
+      main {
+        max-width: none;
+        padding: 0
+      }
+
+      .hero,
+      .section-card {
+        box-shadow: none;
+        break-inside: avoid
+      }
+
+      .table-wrap {
+        overflow: visible
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside>
+      <div class="brand">Cover Letter Agent</div>
+      <div class="brand-subtitle">Technical Design · Multi-Agent Pipeline</div>
+      <nav>
+        <div class="nav-group">Orientation</div>
+        <a href="#summary">Executive Summary</a>
+        <a href="#goals">Goals &amp; Non-Goals</a>
+        <div class="nav-group">Structure &amp; Flow</div>
+        <a href="#architecture">System Architecture</a>
+        <a href="#flow">End-to-End Flow</a>
+        <div class="nav-group">The Agents</div>
+        <a href="#components">Components</a>
+        <div class="nav-group">Decisions</div>
+        <a href="#decisions">Key Design Decisions</a>
+        <a href="#open">Open Questions</a>
+      </nav>
+    </aside>
+
+    <main>
+      <div class="hero">
+        <span class="eyebrow">Technical Design · Personal Tool</span>
+        <h1>Cover Letter Agent</h1>
+        <p class="subtitle">A Planner → Generator → Reviewer pipeline that turns a job posting into a formatted,
+          template-conformant cover letter draft — no manual chat loop, no context bloat from dumping every past
+          letter into one prompt.</p>
+        <p class="hero-note">Replaces a manual Claude Project workflow (paste JD → copy output → format → upload)
+          with a repeatable local CLI: retrieval-based example selection, a fixed/flexible template contract, and a
+          rubric-checking Reviewer agent that catches what a single generation pass misses.</p>
+      </div>
+
+      <!-- ===================== SUMMARY ===================== -->
+      <section class="section-card" id="summary">
+        <div class="section-kicker">Problem</div>
+        <h2>Executive Summary</h2>
+        <p>Cover letters are currently generated through a manual chat loop: paste a job description into a Claude
+          Project pre-loaded with an instructions file and ~15 past letters as implicit examples, then manually copy
+          the output into a <code>.docx</code> and upload it to Drive. This works, but it doesn't scale cleanly and
+          has no verification step before the draft reaches you.</p>
+        <div class="callout-grid">
+          <div class="callout">
+            <div class="label">Current process</div>
+            <div class="value">Manual, per-letter</div>
+          </div>
+          <div class="callout">
+            <div class="label">Example bank</div>
+            <div class="value">~15 past letters</div>
+          </div>
+          <div class="callout">
+            <div class="label">Template contract</div>
+            <div class="value">Fixed + flexible</div>
+          </div>
+          <div class="callout">
+            <div class="label">Output</div>
+            <div class="value">Local .docx only</div>
+          </div>
+        </div>
+        <div class="why-box">
+          <span class="why-label">Why this matters</span>
+          <p>Three specific gaps motivate the pipeline design: <strong>context bloat</strong> (all past
+            letters sit in context regardless of relevance to the current role), <strong>no verification step</strong>
+            (nothing checks that fixed sentences survived unmodified or that names are correct), and
+            <strong>no repeatability</strong> (every letter requires a fresh chat and manual formatting).</p>
+        </div>
+      </section>
+
+      <!-- ===================== GOALS ===================== -->
+      <section class="section-card" id="goals">
+        <h2>Goals &amp; Non-Goals</h2>
+        <div class="two-col">
+          <div class="arch-box">
+            <h3>Goals</h3>
+            <ul class="check-list">
+              <li>Given a job posting URL or pasted text, produce a <code>.docx</code> draft following the
+                fixed/flexible template.</li>
+              <li>Select few-shot examples by relevance to the target role, not by dumping the whole bank into
+                context.</li>
+              <li>Verify the draft against a rubric before returning it, with one self-correction retry.</li>
+              <li>Run as a local CLI tool with no external write dependencies.</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h3>Non-Goals</h3>
+            <ul class="check-list non-goal-list">
+              <li>No Drive upload — removed to avoid Cornell OAuth friction; output stays local.</li>
+              <li>No web UI in v1.</li>
+              <li>No multi-user support — this is a personal tool.</li>
+              <li>No fine-tuning; all behavior is prompt- and retrieval-driven.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== ARCHITECTURE ===================== -->
+      <section class="section-card" id="architecture">
+        <div class="section-kicker">Structure</div>
+        <h2>System Architecture</h2>
+        <p>The pipeline follows a <strong>Planner → Generator → Reviewer</strong> pattern, with each agent
+          scoped to a single, verifiable responsibility rather than one large prompt handling everything.</p>
+        <div class="diagram">
+          <pre class="mermaid">
+flowchart TD
+    A["Job URL / pasted JD text"] --> B["Ingest<br/>parse posting"]
+    B --> C["Retrieval<br/>embed + search examples"]
+    C --> D["Planner<br/>role type, JD fields, top-k examples"]
+    D --> E["Generator<br/>draft letter"]
+    E --> F{"Reviewer<br/>rubric check"}
+    F -- fail, 1x retry --> E
+    F -- pass --> G["docx Writer"]
+    G --> H["output/company_role.docx"]
+          </pre>
+          <div class="cap">Retrieval feeds the Planner's example selection; the Reviewer is capped at one retry
+            before surfacing issues to the user.</div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="badge">Python</span>
+          <span class="badge">Claude API</span>
+          <span class="badge">Sentence embeddings</span>
+          <span class="badge">python-docx</span>
+          <span class="badge">Local CLI</span>
+        </div>
+      </section>
+
+      <!-- ===================== FLOW ===================== -->
+      <section class="section-card" id="flow">
+        <h2>End-to-End Flow</h2>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="flow-num">1</div>
+            <div>
+              <div class="flow-title">Ingest</div>
+              <div class="flow-desc">Fetch and parse the job posting from a URL (title, company, requirements), or
+                accept pasted JD text as a fallback since scraping reliability varies by job board.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">2</div>
+            <div>
+              <div class="flow-title">Retrieval</div>
+              <div class="flow-desc">Embed the parsed JD and retrieve the top 2–3 most similar past letters from the
+                cached embedding store, filtered by role type.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">3</div>
+            <div>
+              <div class="flow-title">Planner</div>
+              <div class="flow-desc">Classifies role type (quant trading / SWE / markets / trade support) and
+                extracts structured JD fields — company, role title, key requirements.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">4</div>
+            <div>
+              <div class="flow-title">Generator</div>
+              <div class="flow-desc">Drafts the letter — fixed template sentences inserted verbatim, flexible
+                sections written to match the target role using retrieved examples as style reference.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">5</div>
+            <div>
+              <div class="flow-title">Reviewer</div>
+              <div class="flow-desc">Checks the draft against a rubric — fixed sentences intact, correct
+                company/role name throughout, length in range, no generic filler. Fails send one retry back to the
+                Generator with specific issues.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">6</div>
+            <div>
+              <div class="flow-title">docx Writer</div>
+              <div class="flow-desc">Formats the approved draft into <code>.docx</code> and saves it to
+                <code>output/{company}_{role}.docx</code> — no upload, ready for manual review.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== COMPONENTS ===================== -->
+      <section class="section-card" id="components">
+        <div class="section-kicker">The Agents</div>
+        <h2>Components</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>File</th>
+                <th>Responsibility</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag tag-planner">Ingest</span></td>
+                <td><code>ingest.py</code></td>
+                <td>Fetches JD URL, extracts posting text; falls back to pasted text since scraping reliability
+                  varies across Greenhouse, Lever, Workday, etc.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-planner">Retrieval</span></td>
+                <td><code>retrieval.py</code></td>
+                <td>Embeds all past letters once (cached locally), retrieves top-k nearest by cosine similarity at
+                  generation time. The main technical depth in the project.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-planner">Planner</span></td>
+                <td><code>agents/planner.py</code></td>
+                <td>Single API call. Input: parsed JD + <code>instructions.md</code>. Output: role classification,
+                  structured JD fields, retrieval request.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-generator">Generator</span></td>
+                <td><code>agents/generator.py</code></td>
+                <td>Single API call. Drafts the letter using <code>instructions.md</code>, retrieved examples, and
+                  Planner output.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-reviewer">Reviewer</span></td>
+                <td><code>agents/reviewer.py</code></td>
+                <td>Rubric checker, not a rewriter. Pass/fail + specific issues, capped at one retry to the
+                  Generator.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-generator">docx Writer</span></td>
+                <td><code>docx_writer.py</code></td>
+                <td>Formats the final draft into <code>.docx</code> matching existing letter-bank conventions.</td>
+              </tr>
+              <tr>
+                <td><span class="tag tag-planner">Orchestrator</span></td>
+                <td><code>orchestrator.py</code> / <code>main.py</code></td>
+                <td>CLI entrypoint. Wires the full pipeline: <code>python main.py &lt;job_url&gt;</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===================== DECISIONS ===================== -->
+      <section class="section-card" id="decisions">
+        <h2>Key Design Decisions</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Decision</th>
+                <th>Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Retrieval-based example selection over full-context injection</td>
+                <td>Scales as the example bank grows; keeps the Generator's context focused on relevant style
+                  patterns instead of diluted across 15+ letters.</td>
+              </tr>
+              <tr>
+                <td>Separate Reviewer agent rather than generate-and-hope</td>
+                <td>Catches deterministic failures — wrong company name, dropped fixed sentence — that a single-pass
+                  generation is prone to, without a human catching it manually.</td>
+              </tr>
+              <tr>
+                <td>One retry cap on Reviewer failure</td>
+                <td>Avoids runaway loops and unnecessary API spend; two failures surface to the user instead of
+                  looping silently.</td>
+              </tr>
+              <tr>
+                <td>No Drive upload</td>
+                <td>Removes an OAuth/API surface causing friction under Cornell's settings; local
+                  <code>.docx</code> output is simpler and more reliable for v1.</td>
+              </tr>
+              <tr>
+                <td>CLI-first, no UI</td>
+                <td>Fastest path to a working, testable tool. A Chrome extension or other client can wrap this
+                  backend later without touching the core pipeline.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===================== OPEN QUESTIONS ===================== -->
+      <section class="section-card" id="open">
+        <h2>Open Questions / Future Work</h2>
+        <ul class="check-list">
+          <li><strong>Scraping robustness</strong> — different job boards render JD content differently; is a
+            generic scraper sufficient, or does this need per-site handling? Punting to paste-fallback in v1.
+            <span class="pill pill-core">v1 decision</span></li>
+          <li><strong>Example bank growth</strong> — as more letters accumulate, does role classification need to
+            get more granular (e.g. market-making vs. prop trading within "quant trading")?
+            <span class="pill pill-future">future</span></li>
+          <li><strong>Feedback loop</strong> — track which letters led to interviews/responses and feed that signal
+            back into example selection or Reviewer rubric weighting. <span class="pill pill-future">future</span>
+          </li>
+          <li><strong>Chrome extension wrapper</strong> — once the CLI backend is stable, wrap it in a FastAPI
+            service (reusing the Gmail AI Reply Reviewer's backend pattern) for one-click generation from a job
+            posting tab. <span class="pill pill-future">future</span></li>
+        </ul>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>
+    function renderMermaid() {
+      if (typeof mermaid === 'undefined') {
+        document.querySelectorAll('pre.mermaid').forEach(function (el) {
+          var note = document.createElement('div');
+          note.style.cssText = 'color:#a8261c;font:12px ui-monospace,Menlo,monospace;padding:8px;border:1px dashed #a55;border-radius:6px';
+          note.textContent = 'Diagram could not load: mermaid bundle was blocked. Open this file over http:// (a local web server) rather than file:// or a sandboxed preview.';
+          el.replaceWith(note);
+        });
+        return;
+      }
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+        flowchart: { htmlLabels: true, useMaxWidth: true, curve: 'linear' },
+        themeVariables: {
+          fontFamily: 'ui-monospace, SF Mono, Menlo, monospace',
+          fontSize: '13px',
+          primaryColor: '#e8f2ff',
+          primaryBorderColor: '#2f80ed',
+          primaryTextColor: '#0f2744',
+          lineColor: '#617083'
+        }
+      });
+      mermaid.run().catch(function (err) { console.error('mermaid.run failed', err); });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', renderMermaid);
+    } else {
+      renderMermaid();
+    }
+  </script>
+</body>
+
+</html>

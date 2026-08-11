@@ -1,0 +1,37 @@
+# Secrets
+.env
+
+# Personal writing instructions, resume, and past cover letters — contain
+# your real name, work history, and job-search details. Never commit these.
+instructions.md
+resume.md
+resume.txt
+Kahm_Vivian_Resume.md
+examples/*
+!examples/README.md
+!examples/sample_letter.txt.example
+
+# graphify knowledge-graph output — may embed content from gitignored
+# personal files (resume, instructions) pulled in during a /graphify run.
+graphify-out/
+
+# Generated cover letters
+output/*
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Embeddings cache
+.embeddings_cache/
+*.npy
+*.npz
+
+# Editor / OS cruft
+.DS_Store
+.vscode/
+.idea/
