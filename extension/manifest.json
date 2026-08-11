@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail AI Reply Reviewer",
+  "version": "0.0.1",
+  "description": "Get AI feedback on your Gmail replies using the context of the open thread.",
+  "action": {
+    "default_title": "Gmail AI Reply Reviewer"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"],
+      "world": "MAIN"
+    }
+  ],
+  "permissions": []
+}
