@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Notebook Math Scribe",
+  "version": "0.0.1",
+  "description": "Convert a screenshot of a math equation or proof into clean Jupyter markdown, right inside the notebook.",
+  "action": {
+    "default_title": "Notebook Math Scribe"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "options_page": "options.html",
+  "permissions": ["storage"]
+}
