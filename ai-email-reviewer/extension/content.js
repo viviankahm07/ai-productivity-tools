@@ -2,7 +2,6 @@ console.log("Gmail AI Reply Reviewer: content script loaded");
 
 // Points at a Railway backend
 const BACKEND_BASE_URL = "https://REDACTED.up.railway.app/review";
-
 /**
  * extractThread()
  * Finds the open Gmail thread container and pulls out a structured list of
