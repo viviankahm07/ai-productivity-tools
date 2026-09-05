@@ -1,7 +1,52 @@
 console.log("Gmail AI Reply Reviewer: content script loaded");
 
-// Points at a Railway backend
-const BACKEND_BASE_URL = "https://REDACTED.up.railway.app";/**
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
+const BACKEND_URL_REQUEST_TYPE = "gmail-ai-reviewer:get-backend-url-request";
+const BACKEND_URL_RESPONSE_TYPE = "gmail-ai-reviewer:get-backend-url-response";
+const BACKEND_URL_TIMEOUT_MS = 3000;
+
+/**
+ * getBackendUrl()
+ * Resolves the backend URL configured on the options page, falling back to
+ * DEFAULT_BACKEND_URL if nothing is saved yet.
+ *
+ * This content script runs in the page's MAIN world (see manifest.json), so
+ * it has no direct access to chrome.storage - only isolated-world content
+ * scripts do. storage_bridge.js runs in the isolated world alongside this
+ * script and relays chrome.storage.local reads over window.postMessage
+ * (both worlds share the same window/DOM, so postMessage crosses the
+ * boundary between them). Falls back to the default if the bridge doesn't
+ * respond in time, so a missing/misbehaving bridge degrades gracefully
+ * rather than hanging a review request forever.
+ */
+function getBackendUrl() {
+  return new Promise((resolve) => {
+    const requestId = `${Date.now()}-${Math.random()}`;
+    let settled = false;
+
+    function onMessage(event) {
+      if (event.source !== window) return;
+      if (!event.data || event.data.type !== BACKEND_URL_RESPONSE_TYPE) return;
+      if (event.data.requestId !== requestId) return;
+
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      resolve(event.data.backendUrl || DEFAULT_BACKEND_URL);
+    }
+
+    window.addEventListener("message", onMessage);
+    window.postMessage({ type: BACKEND_URL_REQUEST_TYPE, requestId }, "*");
+
+    setTimeout(() => {
+      if (settled) return;
+      window.removeEventListener("message", onMessage);
+      console.log("[REVIEW] Storage bridge didn't respond in time, falling back to the default backend URL.");
+      resolve(DEFAULT_BACKEND_URL);
+    }, BACKEND_URL_TIMEOUT_MS);
+  });
+}
+
+/**
  * extractThread()
  * Finds the open Gmail thread container and pulls out a structured list of
  * messages (sender, body text, collapsed state) from it.
@@ -217,10 +262,11 @@ function buildReviewConversation(messages, draftText) {
  */
 async function requestReview(conversation) {
   console.log("[REVIEW] Sending review request to backend...");
-  console.log(`[REVIEW] Backend URL: ${BACKEND_BASE_URL}/review`);
+  const backendUrl = await getBackendUrl();
+  console.log(`[REVIEW] Backend URL: ${backendUrl}/review`);
 
   try {
-    const response = await fetch(`${BACKEND_BASE_URL}/review`, {
+    const response = await fetch(`${backendUrl}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation }),

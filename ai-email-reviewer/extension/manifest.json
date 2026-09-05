@@ -9,9 +9,16 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
+      "js": ["storage_bridge.js"]
+    },
+    {
+      "matches": ["https://mail.google.com/*"],
       "js": ["content.js"],
       "world": "MAIN"
     }
   ],
-  "permissions": []
+  "options_page": "options.html",
+  "permissions": [
+    "storage"
+  ]
 }

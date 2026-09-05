@@ -55,7 +55,10 @@ backend/            FastAPI service
 
 extension/           Chrome extension (Manifest V3)
   manifest.json        Extension manifest
-  content.js           Gmail DOM extraction, redaction, and UI injection
+  content.js           Gmail DOM extraction, redaction, and UI injection (MAIN world)
+  storage_bridge.js    Relays chrome.storage.local reads to content.js (isolated world)
+  options.html          Settings page markup
+  options.js            Settings page logic (backend URL, test connection)
 
 assets/screenshots/  README images
 ```
@@ -89,7 +92,12 @@ The API is now available at `http://127.0.0.1:8000` (`/health` should return `{"
 
 1. In Chrome, open `chrome://extensions`, enable **Developer mode**, and click **Load unpacked**.
 2. Select the `extension/` folder.
-3. `extension/content.js` points `BACKEND_BASE_URL` at `http://127.0.0.1:8000` by default, matching the local backend above. If you deploy your own backend elsewhere, update that constant locally — see the comment above it for why that value shouldn't be committed to a public repo.
+3. Click the extension's **Details** → **Extension options** (or right-click its
+   toolbar icon → **Options**) and set the **Backend URL** (defaults to
+   `http://127.0.0.1:8000` if left blank, matching the local backend above). Use
+   **Test connection** to confirm it can reach `/health`. This is stored in
+   `chrome.storage.local`, not in a tracked file, so pointing it at your own deployed
+   backend never risks committing that URL.
 4. Open an email thread in Gmail — a floating "✨" button appears in the bottom-right corner.
 
 ## Environment Variables
