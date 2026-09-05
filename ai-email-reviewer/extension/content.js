@@ -1,10 +1,7 @@
 console.log("Gmail AI Reply Reviewer: content script loaded");
 
-// Points at a local backend by default (see backend/README.md to run one).
-// If you deploy your own backend, set its URL here on your own machine —
-// don't commit a real, publicly-reachable URL to a public repo, since
-// anyone reading the source could call it directly and spend your API quota.
-const BACKEND_BASE_URL = "http://127.0.0.1:8000";
+// Points at a Railway backend
+const BACKEND_BASE_URL = "https://REDACTED.up.railway.app/review"";
 
 /**
  * extractThread()
