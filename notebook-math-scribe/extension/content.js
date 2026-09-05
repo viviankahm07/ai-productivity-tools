@@ -3,7 +3,7 @@ console.log("Notebook Math Scribe: content script loaded");
 // Local default only - never hardcode a real deployed backend URL here (or
 // commit one). The real value lives in chrome.storage.local, set via the
 // options page, and is read fresh on every request in getSettings() below.
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
+const DEFAULT_BACKEND_URL = "https://REDACTED.up.railway.app/";
 
 /**
  * getSettings()
