@@ -7,14 +7,14 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8000";
 
 /**
  * getSettings()
- * Reads the backend URL + API key from chrome.storage.local, falling back
- * to the local default backend URL if nothing has been configured yet.
+ * Reads the backend URL from chrome.storage.local, falling back to the
+ * local default backend URL if nothing has been configured yet.
  */
 function getSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(["backendUrl", "apiKey"], (result) => {
+    chrome.storage.local.get(["backendUrl"], (result) => {
       const backendUrl = (result.backendUrl || DEFAULT_BACKEND_URL).replace(/\/$/, "");
-      resolve({ backendUrl, apiKey: result.apiKey || "" });
+      resolve({ backendUrl });
     });
   });
 }
@@ -23,19 +23,16 @@ function getSettings() {
  * requestConvert(imageDataUrl)
  * POSTs the pasted image to the backend's /convert endpoint and returns the
  * transcribed markdown. Throws with a user-facing message on any failure
- * (missing/incorrect API key, network error, backend error, etc.).
+ * (network error, backend error, etc.).
  */
 async function requestConvert(imageDataUrl) {
-  const { backendUrl, apiKey } = await getSettings();
-
-  const headers = { "Content-Type": "application/json" };
-  if (apiKey) headers["X-API-Key"] = apiKey;
+  const { backendUrl } = await getSettings();
 
   let response;
   try {
     response = await fetch(`${backendUrl}/convert`, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_base64: imageDataUrl }),
     });
   } catch (err) {
@@ -51,10 +48,6 @@ async function requestConvert(imageDataUrl) {
       detail = errorBody.detail || "";
     } catch (_) {
       detail = await response.text().catch(() => "");
-    }
-
-    if (response.status === 401) {
-      throw new Error("Backend rejected the request (401): check the API key in the options page.");
     }
     throw new Error(`Backend responded with ${response.status}${detail ? `: ${detail}` : ""}.`);
   }

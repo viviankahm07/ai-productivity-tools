@@ -22,9 +22,9 @@ vision-capable OpenAI model, and inserted into the current cell with one click.
   Jupyter Notebook (`window.Jupyter`) or the Notebook 7 / JupyterLab-style frontend
   and inserts the converted markdown accordingly, falling back to "Copy to clipboard"
   if neither is found.
-- **Configurable backend + API key** — the backend URL and a shared-secret API key
-  are set on an options page and read from `chrome.storage.local` at request time;
-  nothing is hardcoded in the shipped extension.
+- **Configurable backend URL** — set on an options page and read from
+  `chrome.storage.local` at request time; nothing is hardcoded in the shipped
+  extension.
 
 ## Tech Stack
 
@@ -37,7 +37,7 @@ Math screenshot (clipboard)
         │  user clicks 📐, pastes into the panel's paste target
         ▼
 Chrome extension UI (Shadow DOM panel)
-        │  POST /convert  {image_base64}  +  X-API-Key
+        │  POST /convert  {image_base64}
         ▼
 FastAPI backend  (backend/routers/convert.py)
         │  chat.completions.create(... image_url ...)
@@ -72,7 +72,7 @@ extension/           Chrome extension (Manifest V3)
   manifest.json        Extension manifest
   content.js           Floating button/panel UI, paste handling, cell insertion
   options.html          Settings page markup
-  options.js            Settings page logic (backend URL, API key, test connection)
+  options.js            Settings page logic (backend URL, test connection)
 ```
 
 ## Getting Started
@@ -93,7 +93,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# then edit .env and set OPENAI_API_KEY (and optionally API_SHARED_SECRET)
+# then edit .env and set OPENAI_API_KEY
 
 uvicorn main:app --reload
 ```
@@ -108,9 +108,8 @@ The API is now available at `http://127.0.0.1:8000` (`/health` should return
 2. Select the `extension/` folder.
 3. Click the extension's **Details** → **Extension options** (or right-click its
    toolbar icon → **Options**) and set the **Backend URL** (defaults to
-   `http://127.0.0.1:8000` if left blank) and, if you set `API_SHARED_SECRET` on the
-   backend, the matching **API Key**. Use **Test connection** to confirm it can reach
-   `/health`.
+   `http://127.0.0.1:8000` if left blank). Use **Test connection** to confirm it can
+   reach `/health`.
 4. Open a notebook at `http://localhost/...` or `http://127.0.0.1/...` — a floating
    "📐" button appears in the bottom-right corner.
 5. Copy a screenshot of an equation or derivation, click the button, click into the
@@ -125,13 +124,12 @@ real values):
 |---|---|---|
 | `OPENAI_API_KEY` | Yes | Your OpenAI API key. Without it, `/convert` returns a `500` with a clear message. |
 | `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini`. Must be a vision-capable model. |
-| `API_SHARED_SECRET` | No | Shared secret the extension must send as `X-API-Key`. If unset, `/convert` skips the check and logs a warning instead — fine for local dev, not for a public deploy. |
 
 ## Testing
 
 The backend has a pytest suite covering the endpoint (health check, missing-API-key
-error path, missing/incorrect `X-API-Key` returns 401, and a mocked-OpenAI-response
-happy path — the real OpenAI API is never called in tests):
+error path, and a mocked-OpenAI-response happy path — the real OpenAI API is never
+called in tests):
 
 ```bash
 cd backend
@@ -153,9 +151,10 @@ and DevTools console logging (`[notebook-math-scribe] ...`) for manual verificat
   .cm-content` remaining CodeMirror 6's active-cell selector; if that markup changes,
   insertion falls through to the "click into a cell first" error and "Copy to
   clipboard" remains available as a fallback.
-- The deployed backend has no per-user accounts — `API_SHARED_SECRET` is a single
-  shared key, and CORS is permissive (`allow_origins=["*"]`) since a Chrome
-  extension's origin isn't known ahead of time for an unpacked install.
+- The deployed backend has no authentication and a permissive CORS policy
+  (`allow_origins=["*"]`) — a deliberate tradeoff since it holds no user data or
+  sessions, but it does mean anyone with the URL can call `/convert` and consume the
+  configured OpenAI quota.
 - Transcription quality depends entirely on the configured OpenAI model and the
   screenshot's legibility; handwritten or low-resolution images may transcribe
   imperfectly, and the system prompt explicitly avoids hedging in the output.
@@ -165,6 +164,7 @@ and DevTools console logging (`[notebook-math-scribe] ...`) for manual verificat
 - Support pasting multiple images per conversion for multi-part derivations.
 - Persist recent conversions locally so a panel accidentally closed mid-review isn't
   lost.
-- Add lightweight rate limiting on the backend in addition to the shared API key.
+- Add lightweight rate limiting or an API key check on the backend before making it
+  publicly reachable long-term.
 - Detect and support additional Jupyter frontends (e.g. VS Code's notebook UI) beyond
   classic Notebook and Notebook 7/JupyterLab.

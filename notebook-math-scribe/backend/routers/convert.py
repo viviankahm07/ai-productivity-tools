@@ -1,15 +1,12 @@
 """The /convert endpoint: transcribes a math screenshot into Jupyter markdown."""
 
-import logging
-
 import openai
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import config
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 _client: openai.OpenAI | None = None
 
@@ -26,24 +23,6 @@ def get_client() -> openai.OpenAI:
             )
         _client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
     return _client
-
-
-def require_api_key(x_api_key: str | None) -> None:
-    """Checks the caller's X-API-Key header against API_SHARED_SECRET.
-
-    If API_SHARED_SECRET isn't configured (e.g. local dev), the check is
-    skipped entirely and a warning is logged instead of failing closed, so
-    local development without the header still works.
-    """
-    if not config.API_SHARED_SECRET:
-        logger.warning(
-            "API_SHARED_SECRET is not set; skipping X-API-Key check. "
-            "Set it before deploying this backend publicly."
-        )
-        return
-
-    if x_api_key != config.API_SHARED_SECRET:
-        raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key.")
 
 
 SYSTEM_PROMPT = """\
@@ -76,9 +55,7 @@ def _as_data_url(image_base64: str) -> str:
 
 
 @router.post("/convert", response_model=ConvertResponse)
-def convert(request: ConvertRequest, x_api_key: str | None = Header(default=None)):
-    require_api_key(x_api_key)
-
+def convert(request: ConvertRequest):
     image_url = _as_data_url(request.image_base64)
 
     try:

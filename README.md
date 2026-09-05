@@ -46,7 +46,7 @@ cp .env.example .env   # then fill in the required keys — see that project's R
 - `internship-watcher` needs no API key to scrape, but a `GITHUB_TOKEN` is required if you want it to file issues.
 - `agentic-cover-letter-generator` needs an `ANTHROPIC_API_KEY`, plus your own `resume.md` and `instructions.md` (copied from the tracked `.example` templates).
 - `ai-email-reviewer` needs an `OPENAI_API_KEY` for the backend, then the `extension/` folder loaded unpacked in Chrome.
-- `notebook-math-scribe` needs an `OPENAI_API_KEY` for the backend (plus an optional `API_SHARED_SECRET` if you want the endpoint locked down), then the `extension/` folder loaded unpacked in Chrome.
+- `notebook-math-scribe` needs an `OPENAI_API_KEY` for the backend, then the `extension/` folder loaded unpacked in Chrome.
 
 ## A note on personal data
 

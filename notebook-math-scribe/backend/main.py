@@ -9,8 +9,8 @@ app = FastAPI(title="Notebook Math Scribe Backend")
 
 # Chrome extensions call from an origin like "chrome-extension://<extension-id>",
 # which isn't known ahead of time for an unpacked/dev install, so we allow any
-# origin. Requests to /convert are still gated by the X-API-Key check in
-# routers/convert.py.
+# origin. This backend has no auth/session state, so a permissive CORS policy
+# doesn't expose user data to other sites.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

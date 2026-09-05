@@ -32,7 +32,6 @@ def test_convert_without_api_key_returns_clear_error(monkeypatch):
     """/convert should fail with a helpful message, not a stack trace, when
     the server has no OPENAI_API_KEY configured."""
     monkeypatch.setattr(convert.config, "OPENAI_API_KEY", None)
-    monkeypatch.setattr(convert.config, "API_SHARED_SECRET", None)
     convert._client = None  # reset the cached client so the patched key takes effect
 
     response = client.post("/convert", json={"image_base64": SAMPLE_IMAGE_BASE64})
@@ -41,34 +40,9 @@ def test_convert_without_api_key_returns_clear_error(monkeypatch):
     assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
-def test_convert_missing_api_key_header_returns_401(monkeypatch):
-    """When API_SHARED_SECRET is configured, a request with no X-API-Key
-    header at all must be rejected."""
-    monkeypatch.setattr(convert.config, "API_SHARED_SECRET", "test-secret")
-
-    response = client.post("/convert", json={"image_base64": SAMPLE_IMAGE_BASE64})
-
-    assert response.status_code == 401
-
-
-def test_convert_incorrect_api_key_header_returns_401(monkeypatch):
-    """A wrong X-API-Key must also be rejected, not just a missing one."""
-    monkeypatch.setattr(convert.config, "API_SHARED_SECRET", "test-secret")
-
-    response = client.post(
-        "/convert",
-        json={"image_base64": SAMPLE_IMAGE_BASE64},
-        headers={"X-API-Key": "wrong-secret"},
-    )
-
-    assert response.status_code == 401
-
-
 def test_convert_happy_path_returns_markdown(monkeypatch):
-    """With a valid API key and a mocked OpenAI client, /convert should
-    return the model's transcription as-is. The real OpenAI API is never
-    called."""
-    monkeypatch.setattr(convert.config, "API_SHARED_SECRET", "test-secret")
+    """With a mocked OpenAI client, /convert should return the model's
+    transcription as-is. The real OpenAI API is never called."""
 
     class FakeMessage:
         content = "## Step 1\n\n$$e^{i\\pi} + 1 = 0$$"
@@ -91,11 +65,7 @@ def test_convert_happy_path_returns_markdown(monkeypatch):
 
     monkeypatch.setattr(convert, "get_client", lambda: FakeClient())
 
-    response = client.post(
-        "/convert",
-        json={"image_base64": SAMPLE_IMAGE_BASE64},
-        headers={"X-API-Key": "test-secret"},
-    )
+    response = client.post("/convert", json={"image_base64": SAMPLE_IMAGE_BASE64})
 
     assert response.status_code == 200
     assert response.json() == {"markdown": "## Step 1\n\n$$e^{i\\pi} + 1 = 0$$"}
