@@ -13,9 +13,19 @@ file is one letter.
 - Role type: filenames are NOT parsed for a role-type prefix. Instead, map
   each filename to a role type in `role_types.json` in this directory
   (keys are exact filenames, values must match
-  `src/agents/planner.VALID_ROLE_TYPES`: `"quant_trading"`, `"swe"`, or
-  `"markets_and_st"`). A file with no entry in `role_types.json` still
-  gets ranked by similarity, it just never receives the role-type boost.
+  `src/agents/planner.VALID_ROLE_TYPES`):
+  - `"swe"`: general software engineering, backend, full-stack, infra, or
+    AI/ML roles with no notable finance or business/commercial framing.
+  - `"swe_finance"`: SWE roles at a bank, trading firm, exchange, or other
+    finance-industry company, or roles explicitly framed around
+    markets/trading tech — even if the daily work is just writing code.
+  - `"swe_business"`: SWE roles with a strong business/product/commercial
+    framing — fintech/payments, e-commerce, enterprise SaaS, or any
+    posting that emphasizes customer/business impact alongside the
+    technical work.
+
+  A file with no entry in `role_types.json` still gets ranked by
+  similarity, it just never receives the role-type boost.
 
 These files are embedded (`src/retrieval.embed_examples()`) and searched
 (`src/retrieval.retrieve_similar()`) to find the most similar past letters

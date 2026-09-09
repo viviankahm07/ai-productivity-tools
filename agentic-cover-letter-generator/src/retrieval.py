@@ -209,7 +209,7 @@ def retrieve_similar(jd_text: str, role_type: str, k: int = 3) -> list[str]:
         jd_text: The job description text to match against.
         role_type: Role type to boost matching examples by — must match a
             value in examples/role_types.json to have any effect (e.g.
-            "quant_trading", "swe", "markets_and_st", per
+            "swe", "swe_finance", "swe_business", per
             src.agents.planner.VALID_ROLE_TYPES). Pass an empty string to
             disable boosting entirely.
         k: Number of similar examples to return.
@@ -225,24 +225,23 @@ def retrieve_similar(jd_text: str, role_type: str, k: int = 3) -> list[str]:
 
 if __name__ == "__main__":
     sample_jd = """
-    Quantitative Trading Intern - Summer 2027
+    Software Engineering Intern, Trading Systems - Summer 2027
 
-    We're looking for a Quantitative Trading Intern to join our systematic
-    trading desk. You'll help design, backtest, and monitor short-horizon
-    trading strategies across futures and equities, working closely with
-    traders and researchers.
+    We're looking for a Software Engineering Intern to join our systematic
+    trading desk's engineering team. You'll help build and test the tools
+    and infrastructure that support short-horizon trading strategies across
+    futures and equities, working closely with traders and engineers.
 
     Minimum Qualifications:
-    - Pursuing a Bachelor's or Master's in CS, Math, Statistics, or a
-      related quantitative field
+    - Pursuing a Bachelor's or Master's in CS or a related field
     - Strong Python skills; comfort with numpy/pandas
-    - Solid grounding in probability and statistics
+    - Solid CS fundamentals: data structures and algorithms
 
     Preferred Qualifications:
-    - Prior trading, market-making, or quant research experience
-    - Familiarity with time-series analysis
+    - Prior experience building trading, market-making, or financial systems
+    - Familiarity with low-latency or distributed systems
     """
-    sample_role_type = "quant_trading"
+    sample_role_type = "swe_finance"
 
     ranked = _rank_examples(sample_jd, sample_role_type)
     k = 3

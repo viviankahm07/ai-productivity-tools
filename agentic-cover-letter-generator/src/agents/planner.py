@@ -15,7 +15,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 import config
 
-VALID_ROLE_TYPES = {"quant_trading", "swe", "markets_and_st"}
+VALID_ROLE_TYPES = {"swe", "swe_finance", "swe_business"}
 REQUIRED_FIELDS = {
     "role_type",
     "company",
@@ -30,9 +30,11 @@ SYSTEM_PROMPT_TEMPLATE = """You are a job-posting classifier and field extractor
 Given a job description, classify its role type and extract the fields needed to draft a tailored cover letter.
 
 Role type definitions:
-- "quant_trading": quantitative trading, quant research, quant developer roles
-- "swe": software engineering, backend, full-stack roles
-- "markets_and_st": markets, sales & trading, trading desk roles that aren't primarily quantitative/research-focused
+- "swe": general software engineering, backend, full-stack, infra, or AI/ML roles with no notable finance or business/commercial framing.
+- "swe_finance": SWE roles at a bank, trading firm, exchange, or other finance-industry company, or roles explicitly framed around markets/trading tech (quant developer, trading systems, financial engineering) — even if the daily work is just writing code.
+- "swe_business": SWE roles with a strong business/product/commercial framing — fintech/payments, e-commerce, enterprise SaaS, or any posting that emphasizes customer/business impact alongside the technical work.
+
+Tiebreak for ambiguous postings: default to "swe" unless the posting itself explicitly names markets/trading (-> "swe_finance") or leads with business/customer impact (-> "swe_business").
 
 How to split requirements into minimum_requirements vs preferred_requirements:
 - If the posting explicitly separates "required"/"must-have" qualifications from "preferred"/"nice-to-have"/"bonus" qualifications, split them accordingly.
@@ -48,7 +50,7 @@ The cover letter writing instructions this classification will feed into are:
 
 Respond with ONLY valid JSON, no markdown code fences, no commentary, in exactly this shape:
 {{
-  "role_type": "quant_trading" | "swe" | "markets_and_st",
+  "role_type": "swe" | "swe_finance" | "swe_business",
   "company": string,
   "role_title": string,
   "minimum_requirements": [string, ...],
@@ -135,7 +137,7 @@ def plan(jd_text: str, instructions: str) -> dict:
     Returns:
         A dict shaped like:
             {
-                "role_type": "quant_trading" | "swe" | "markets_and_st",
+                "role_type": "swe" | "swe_finance" | "swe_business",
                 "company": str,
                 "role_title": str,
                 "minimum_requirements": [str, ...],   # up to 5 items
@@ -164,22 +166,23 @@ def plan(jd_text: str, instructions: str) -> dict:
 
 if __name__ == "__main__":
     sample_jd = """
-    Senior Quantitative Trading Analyst - Acme Capital
+    Software Engineer, Trading Systems - Acme Capital
 
-    Acme Capital is seeking a Senior Quantitative Trading Analyst to join our
-    systematic trading desk. You will design and implement statistical
-    arbitrage strategies across equities and futures markets, working
-    closely with researchers and engineers to bring models into production.
+    Acme Capital is seeking a Software Engineer to join our systematic
+    trading desk's engineering team. You will design and build the
+    low-latency infrastructure that executes trading strategies across
+    equities and futures markets, working closely with quants and traders
+    to bring models into production.
 
     Minimum Qualifications:
-    - 3+ years of experience in quantitative trading or research
-    - Strong background in statistics, probability, and time-series analysis
+    - 3+ years of professional software engineering experience
+    - Strong CS fundamentals: data structures, algorithms, concurrency
     - Proficiency in Python and/or C++
-    - Bachelor's degree in a quantitative field (CS, Math, Physics, Stats, or related)
+    - Bachelor's degree in Computer Science or a related field
 
     Preferred Qualifications:
-    - Experience with large-scale distributed data pipelines
-    - Familiarity with options pricing and derivatives
+    - Experience building low-latency or high-throughput trading systems
+    - Familiarity with market data feeds, order management, or exchange connectivity
     - Prior experience in a systematic/HFT trading environment
     - Exposure to cloud infrastructure (AWS/GCP)
     """

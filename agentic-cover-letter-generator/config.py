@@ -32,7 +32,7 @@ OUTPUT_DIR = BASE_DIR / "output"
 
 # Filename -> role_type manifest used by src/retrieval.py to boost examples
 # matching the current job's role_type. Keys must match VALID_ROLE_TYPES in
-# src/agents/planner.py ("quant_trading", "swe", "markets_and_st").
+# src/agents/planner.py ("swe", "swe_finance", "swe_business").
 ROLE_TYPES_PATH = EXAMPLES_DIR / "role_types.json"
 
 # Where src/retrieval.py caches example-letter embeddings so they aren't
