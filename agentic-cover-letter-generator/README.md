@@ -3,7 +3,7 @@
 An agentic CLI tool that drafts a tailored cover letter from a job posting.
 Give it a job URL (or raw job description text) and it fetches the posting,
 retrieves your most relevant past letters by embedding similarity, and runs
-a **Planner &rarr; Generator &rarr; Reviewer** pipeline of Claude API calls to
+a **Planner &rarr; Generator &rarr; Reviewer** pipeline of OpenAI API calls to
 produce a polished `.docx` draft — checked against your own resume and
 writing instructions so it doesn't invent experience you don't have.
 
@@ -48,7 +48,7 @@ Then set up your personal, gitignored config and content files from their
 ```bash
 # API key + contact info used in the letter header
 cp .env.example .env
-# then edit .env and add your ANTHROPIC_API_KEY and contact details
+# then edit .env and add your OPENAI_API_KEY and contact details
 
 # your resumes — used by the Generator/Reviewer to keep claims honest.
 # One per role_type (src/agents/planner.VALID_ROLE_TYPES: swe,

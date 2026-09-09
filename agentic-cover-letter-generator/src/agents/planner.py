@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-import anthropic
+import openai
 
 # Allow this module to be run directly (`python src/agents/planner.py`) as
 # well as imported normally — either way, `config` (at the repo root) needs
@@ -124,7 +124,7 @@ def _parse_planner_response(raw_text: str) -> dict:
 def plan(jd_text: str, instructions: str) -> dict:
     """Analyze the job description and produce a structured plan.
 
-    Makes a single Claude API call to classify the role type and extract
+    Makes a single OpenAI API call to classify the role type and extract
     the fields the Generator agent needs, guided by the user's cover
     letter writing instructions.
 
@@ -148,18 +148,22 @@ def plan(jd_text: str, instructions: str) -> dict:
         PlannerError: If the model's response can't be parsed into the
             expected shape. The raw response is included in the message.
     """
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
 
-    response = client.messages.create(
+    response = client.chat.completions.create(
         model=config.MODEL_NAME,
         max_tokens=1024,
-        system=SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
-        messages=[{"role": "user", "content": jd_text}],
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
+            },
+            {"role": "user", "content": jd_text},
+        ],
     )
 
-    raw_text = next(
-        (block.text for block in response.content if block.type == "text"), ""
-    )
+    raw_text = response.choices[0].message.content or ""
 
     return _parse_planner_response(raw_text)
 

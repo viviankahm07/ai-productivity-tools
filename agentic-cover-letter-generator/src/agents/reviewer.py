@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-import anthropic
+import openai
 
 # Allow this module to be run directly (`python src/agents/reviewer.py`) as
 # well as imported normally — either way, `config` (at the repo root) needs
@@ -152,7 +152,7 @@ def _parse_reviewer_response(raw_text: str) -> tuple[bool, list[str], list[str]]
 def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple[bool, list[str], list[str]]:
     """Review a cover letter draft for quality and adherence to instructions.
 
-    Makes a single Claude API call that checks the draft as a strict rubric
+    Makes a single OpenAI API call that checks the draft as a strict rubric
     (fixed-sentence fidelity, role-title self-consistency, company-name
     consistency, minimum-requirement coverage, length, skill/technology
     accuracy against the resume) without rewriting anything itself. Generic
@@ -183,23 +183,25 @@ def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple
             parsed into the expected shape. The raw response is included
             in the message.
     """
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=config.MODEL_NAME,
             max_tokens=4096,
-            system=SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
+            response_format={"type": "json_object"},
             messages=[
-                {"role": "user", "content": _build_user_message(draft, jd_fields, resume)}
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
+                },
+                {"role": "user", "content": _build_user_message(draft, jd_fields, resume)},
             ],
         )
-    except anthropic.APIError as exc:
+    except openai.APIError as exc:
         raise ReviewerError(f"Reviewer API call failed: {exc}") from exc
 
-    raw_text = next(
-        (block.text for block in response.content if block.type == "text"), ""
-    )
+    raw_text = response.choices[0].message.content or ""
 
     return _parse_reviewer_response(raw_text)
 

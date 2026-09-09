@@ -12,10 +12,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# Default to Claude Opus 5 unless you have a reason to change it.
-MODEL_NAME = "claude-opus-5"
+# Default to GPT-5.6 Sol unless you have a reason to change it.
+MODEL_NAME = "gpt-5.6-sol"
 
 # Cover letter header / contact info — see src/docx_writer.py.
 FULL_NAME = os.environ.get("FULL_NAME")

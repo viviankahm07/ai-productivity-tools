@@ -4,7 +4,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import anthropic
+import openai
 
 # Allow this module to be run directly (`python src/agents/generator.py`) as
 # well as imported normally — either way, `config` (at the repo root) needs
@@ -143,7 +143,7 @@ def generate(
 ) -> str:
     """Draft a cover letter from the planned fields and retrieved examples.
 
-    Makes a single Claude API call to write a first-draft cover letter,
+    Makes a single OpenAI API call to write a first-draft cover letter,
     combining the structured job description fields, similar past letters
     as style/content reference, and the user's writing instructions. The
     resume is used to keep technical claims honest — see the "Resume —
@@ -174,33 +174,34 @@ def generate(
         GeneratorError: If the API call fails, or the response contains no
             usable text content.
     """
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=config.MODEL_NAME,
             max_tokens=2048,
-            system=SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
             messages=[
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
+                },
                 {
                     "role": "user",
                     "content": _build_user_message(jd_fields, examples, resume, feedback),
-                }
+                },
             ],
         )
-    except anthropic.APIError as exc:
+    except openai.APIError as exc:
         raise GeneratorError(f"Generator API call failed: {exc}") from exc
 
-    raw_text = next(
-        (block.text for block in response.content if block.type == "text"), ""
-    )
+    raw_text = response.choices[0].message.content or ""
 
     letter = _strip_code_fences(raw_text).strip()
 
     if not letter:
         raise GeneratorError(
             "Generator returned empty content — nothing usable to write. "
-            f"Raw response content blocks: {response.content!r}"
+            f"Raw response: {response!r}"
         )
 
     return letter

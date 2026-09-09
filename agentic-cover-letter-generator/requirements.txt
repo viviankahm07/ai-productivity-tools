@@ -1,4 +1,4 @@
-anthropic
+openai
 python-docx
 sentence-transformers
 numpy
