@@ -15,6 +15,27 @@ if str(_REPO_ROOT) not in sys.path:
 
 import config
 
+# gpt-5.6-sol is a reasoning model: part of max_completion_tokens is spent on
+# internal reasoning before it writes any visible output, and that spend
+# isn't capped separately — if reasoning alone consumes the whole budget,
+# the response comes back with finish_reason == "length" and an EMPTY
+# message.content (observed in practice: reasoning_tokens=2048,
+# completion_tokens=2048, i.e. reasoning used 100% of the budget on a
+# request whose actual letter output is normally ~300-500 tokens). Budgeting
+# generously here — well beyond the ~300-500 tokens the letter itself needs
+# — leaves headroom for reasoning without silently truncating the letter.
+# A module-level constant (not a magic number inline) so it's a single knob
+# to raise further if this recurs.
+MAX_COMPLETION_TOKENS = 8192
+
+# Reasoning effort for this call — "low" is enough for a cover-letter draft
+# (it's not a hard reasoning task) and leaves far more of
+# MAX_COMPLETION_TOKENS available for the actual letter than the model's
+# default effort would. One of "none", "minimal", "low", "medium", "high",
+# "xhigh" (per the installed openai SDK's ReasoningEffort type) — confirmed
+# accepted by the API for gpt-5.6-sol.
+REASONING_EFFORT = "low"
+
 SYSTEM_PROMPT_TEMPLATE = """You are a cover letter writer. Draft a complete cover letter following the instructions below exactly.
 
 ## Fixed vs. flexible content
@@ -172,14 +193,20 @@ def generate(
 
     Raises:
         GeneratorError: If the API call fails, or the response contains no
-            usable text content.
+            usable text content — including the case where a reasoning
+            model (gpt-5.6-sol) burns its entire MAX_COMPLETION_TOKENS
+            budget on internal reasoning before writing any visible
+            output (finish_reason == "length" with empty content), which
+            raises a more specific, actionable message than a generic
+            empty-content error.
     """
     client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
 
     try:
         response = client.chat.completions.create(
             model=config.MODEL_NAME,
-            max_completion_tokens=2048,
+            max_completion_tokens=MAX_COMPLETION_TOKENS,
+            reasoning_effort=REASONING_EFFORT,
             messages=[
                 {
                     "role": "system",
@@ -194,11 +221,28 @@ def generate(
     except openai.APIError as exc:
         raise GeneratorError(f"Generator API call failed: {exc}") from exc
 
-    raw_text = response.choices[0].message.content or ""
+    choice = response.choices[0]
+    raw_text = choice.message.content or ""
 
     letter = _strip_code_fences(raw_text).strip()
 
     if not letter:
+        if choice.finish_reason == "length":
+            reasoning_tokens = getattr(
+                getattr(response.usage, "completion_tokens_details", None),
+                "reasoning_tokens",
+                None,
+            )
+            raise GeneratorError(
+                "Model exhausted its token budget on reasoning before "
+                "generating any visible output "
+                f"(finish_reason='length', reasoning_tokens={reasoning_tokens}, "
+                f"completion_tokens={getattr(response.usage, 'completion_tokens', None)}, "
+                f"budget={MAX_COMPLETION_TOKENS}) — try raising "
+                "MAX_COMPLETION_TOKENS in src/agents/generator.py, or "
+                "lowering REASONING_EFFORT further (e.g. to 'minimal' or "
+                "'none')."
+            )
         raise GeneratorError(
             "Generator returned empty content — nothing usable to write. "
             f"Raw response: {response!r}"
