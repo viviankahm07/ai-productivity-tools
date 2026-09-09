@@ -40,7 +40,15 @@ cd agentic-cover-letter-generator
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+playwright install chromium
 ```
+
+The `playwright install chromium` step downloads a headless browser used
+as a fallback in `src/ingest.py` when a job posting renders its content
+client-side via JavaScript (e.g. Workday's `*.wd5.myworkdayjobs.com`
+postings) — the fast `requests`-based fetch is tried first and used as-is
+whenever it already returns enough text, so this only kicks in for sites
+that need it.
 
 Then set up your personal, gitignored config and content files from their
 `.example` templates:
