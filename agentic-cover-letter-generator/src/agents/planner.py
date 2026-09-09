@@ -152,7 +152,7 @@ def plan(jd_text: str, instructions: str) -> dict:
 
     response = client.chat.completions.create(
         model=config.MODEL_NAME,
-        max_tokens=1024,
+        max_completion_tokens=1024,
         response_format={"type": "json_object"},
         messages=[
             {

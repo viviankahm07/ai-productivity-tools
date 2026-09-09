@@ -188,7 +188,7 @@ def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple
     try:
         response = client.chat.completions.create(
             model=config.MODEL_NAME,
-            max_tokens=4096,
+            max_completion_tokens=4096,
             response_format={"type": "json_object"},
             messages=[
                 {

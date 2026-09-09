@@ -179,7 +179,7 @@ def generate(
     try:
         response = client.chat.completions.create(
             model=config.MODEL_NAME,
-            max_tokens=2048,
+            max_completion_tokens=2048,
             messages=[
                 {
                     "role": "system",
