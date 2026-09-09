@@ -50,9 +50,18 @@ Then set up your personal, gitignored config and content files from their
 cp .env.example .env
 # then edit .env and add your ANTHROPIC_API_KEY and contact details
 
-# your resume — used by the Generator/Reviewer to keep claims honest
-cp resume.md.example resume.md
-# then edit resume.md with your real education/experience/projects
+# your resumes — used by the Generator/Reviewer to keep claims honest.
+# One per role_type (src/agents/planner.VALID_ROLE_TYPES: swe,
+# swe_finance, swe_business) so each letter is fact-checked against the
+# resume version tailored to that audience — the underlying background is
+# the same, but what you foreground differs. E.g. resume_swe_finance.md
+# can surface quant/markets-adjacent coursework and projects that
+# resume_swe.md might leave out to keep the general-SWE version focused.
+cp resume.md.example resume_swe.md
+cp resume.md.example resume_swe_finance.md
+cp resume.md.example resume_swe_business.md
+# then edit each with your real education/experience/projects, framed for
+# that role type
 
 # your fixed writing template and tone rules
 cp instructions.md.example instructions.md
@@ -63,6 +72,14 @@ cp examples/sample_letter.txt.example examples/your_company.txt
 # then edit it, and add a matching entry to examples/role_types.json,
 # e.g. {"your_company.txt": "swe"} — see examples/README.md for the format
 ```
+
+The pipeline classifies each job posting's `role_type` before picking a
+resume, so if `resume_<role_type>.md` (or `.txt`) is missing for the type it
+just classified, it falls back to a generic `resume.md`/`resume.txt` (if you
+have one) with a printed warning, rather than failing immediately — this is
+intentional, so a partially-split resume setup still works. It only raises
+`FileNotFoundError` if neither the role-specific file nor the generic
+fallback exists.
 
 ## Usage
 
@@ -76,7 +93,9 @@ equivalent and gives friendlier `--help` output.)
 
 ## What's excluded from this repo
 
-`resume.md`, `instructions.md`, and every real letter in `examples/`
+`resume_swe.md`, `resume_swe_finance.md`, `resume_swe_business.md` (and
+their `.txt` counterparts, and the generic `resume.md`/`resume.txt`
+fallback), `instructions.md`, and every real letter in `examples/`
 (including `examples/role_types.json`) are gitignored — they contain real
 personal information: your name, contact details, employers, and the
 companies you've actually applied to. Only their `.example` counterparts

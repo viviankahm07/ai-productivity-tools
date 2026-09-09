@@ -36,8 +36,11 @@ def run_pipeline(job_url_or_text: str) -> str:
         Path to the generated .docx file in output/, as a string.
 
     Raises:
-        FileNotFoundError: If instructions.md doesn't exist, or neither
-            resume.md nor resume.txt exists.
+        FileNotFoundError: If instructions.md doesn't exist, or if no resume
+            can be resolved for the classified role_type — neither a
+            role-specific resume_<role_type>.md/.txt (see
+            config.resolve_resume_path()) nor the generic
+            resume.md/resume.txt fallback exists.
         IngestError: If the job posting can't be fetched/parsed. Printed
             with a clear message before being re-raised.
         PlannerError, GeneratorError, ReviewerError: Propagated as-is from
@@ -50,19 +53,6 @@ def run_pipeline(job_url_or_text: str) -> str:
             "before running the pipeline."
         )
     instructions = config.INSTRUCTIONS_PATH.read_text()
-
-    if config.RESUME_MD_PATH.exists():
-        resume_path = config.RESUME_MD_PATH
-    elif config.RESUME_TXT_PATH.exists():
-        resume_path = config.RESUME_TXT_PATH
-    else:
-        raise FileNotFoundError(
-            f"Neither {config.RESUME_MD_PATH} nor {config.RESUME_TXT_PATH} "
-            "was found. Copy resume.md.example to resume.md and fill in your "
-            "real resume before running the pipeline — the generator and "
-            "reviewer both use it to keep skill/technology claims honest."
-        )
-    resume = resume_path.read_text()
 
     print("Fetching job posting...")
     try:
@@ -77,6 +67,33 @@ def run_pipeline(job_url_or_text: str) -> str:
         f"  -> {jd_fields['role_type']} role at {jd_fields['company']}: "
         f"{jd_fields['role_title']}"
     )
+
+    # Resume resolution happens after classification (not before) because it
+    # needs jd_fields["role_type"] to pick the right role-specific resume.
+    role_type = jd_fields["role_type"]
+    print("Loading resume...")
+    resume_path = config.resolve_resume_path(role_type)
+    if resume_path is None:
+        if config.RESUME_MD_PATH.exists():
+            resume_path = config.RESUME_MD_PATH
+        elif config.RESUME_TXT_PATH.exists():
+            resume_path = config.RESUME_TXT_PATH
+
+        if resume_path is None:
+            role_md_name = config.RESUME_PATHS_BY_ROLE_TYPE[role_type][0].name
+            raise FileNotFoundError(
+                f"{role_md_name} not found (and no generic "
+                f"{config.RESUME_MD_PATH.name} fallback either) — copy "
+                f"resume.md.example to {role_md_name} and fill in your real "
+                f"background for {role_type} roles."
+            )
+        print(
+            f"  WARNING: no role-specific resume found for '{role_type}' — "
+            f"falling back to generic {resume_path.name} instead."
+        )
+    else:
+        print(f"  -> using {resume_path.name}")
+    resume = resume_path.read_text()
 
     print("Retrieving similar example letters...")
     examples = retrieval.retrieve_similar(jd_text, jd_fields["role_type"], k=3)
