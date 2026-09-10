@@ -13,7 +13,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import config
-from src import retrieval
+from src import page_fit, retrieval
 from src.agents.generator import generate
 from src.agents.planner import plan
 from src.agents.reviewer import review
@@ -25,7 +25,10 @@ def run_pipeline(job_url_or_text: str) -> str:
     """Run the full cover letter generation pipeline end to end.
 
     Steps: ingest -> planner -> retrieval -> generator -> reviewer -> (one
-    revise-and-retry pass on failure) -> docx_writer.
+    revise-and-retry pass on failure) -> docx_writer -> page-fit check ->
+    (up to three escalating tightening passes: trim generic filler, tighten
+    rendering spacing/margins, lightly trim in-sentence wording — each
+    re-checked, stopping as soon as it fits).
     Prints a step-by-step progress log throughout, since a full run can
     take 15-30 seconds across several API calls.
 
@@ -103,7 +106,7 @@ def run_pipeline(job_url_or_text: str) -> str:
     draft = generate(jd_fields, examples, instructions, resume)
 
     print("Reviewing...")
-    passed, issues, notes = review(draft, jd_fields, instructions, resume)
+    passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
 
     if not passed:
         print("Review found issues on the first draft:")
@@ -114,7 +117,7 @@ def run_pipeline(job_url_or_text: str) -> str:
         draft = generate(jd_fields, examples, instructions, resume, feedback=issues)
 
         print("Reviewing revised draft...")
-        passed, issues, notes = review(draft, jd_fields, instructions, resume)
+        passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
 
     if passed:
         print("Draft passed review.")
@@ -134,19 +137,123 @@ def run_pipeline(job_url_or_text: str) -> str:
             print(f"  - {note}")
         print()
 
+    def _fix_content_if_failed(draft, passed, issues, notes):
+        """Run one normal content-fix pass if a length-trim regeneration broke review.
+
+        Trimming wording to save space can accidentally rephrase into a new,
+        unverified specific claim (observed in practice: cutting "clear
+        documentation, and effective communication" produced "reusable
+        design patterns" instead — trading one unsupported claim for
+        another). Rather than silently ship whatever the trim pass
+        produced, run it through the normal issues-feedback fix path once
+        before moving on, same as the pipeline's own first-draft handling.
+        """
+        if passed:
+            return draft, passed, issues, notes
+        print("      Content issues found after the trim — attempting one fix pass...")
+        draft = generate(jd_fields, examples, instructions, resume, feedback=issues)
+        passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+        if not passed:
+            print("      WARNING: still did not pass review after the fix pass. Remaining issues:")
+            for issue in issues:
+                print(f"        - {issue}")
+        return draft, passed, issues, notes
+
+    def _render(compact: bool = False) -> str:
+        return write_docx(
+            draft,
+            jd_fields["company"],
+            jd_fields["role_title"],
+            full_name=config.FULL_NAME,
+            location=config.LOCATION,
+            phone=config.PHONE,
+            email=config.EMAIL,
+            linkedin_url=config.LINKEDIN_URL,
+            github_url=config.GITHUB_URL,
+            portfolio_url=config.PORTFOLIO_URL,
+            compact=compact,
+        )
+
     print("Saving to output/...")
-    filepath = write_docx(
-        draft,
-        jd_fields["company"],
-        jd_fields["role_title"],
-        full_name=config.FULL_NAME,
-        location=config.LOCATION,
-        phone=config.PHONE,
-        email=config.EMAIL,
-        linkedin_url=config.LINKEDIN_URL,
-        github_url=config.GITHUB_URL,
-        portfolio_url=config.PORTFOLIO_URL,
-    )
+    filepath = _render()
+
+    print("Checking page fit...")
+    fits, pages = page_fit.check_page_fit(filepath)
+    print(f"  -> estimated {pages:.2f} page(s)" + ("" if fits else " (over one page)"))
+
+    compact = False
+    if not fits:
+        print()
+        print(
+            "Letter runs over one page. Tightening it — content first, then "
+            "spacing, then wording, stopping as soon as it fits:"
+        )
+
+        # (a) Trim generic filler first, if review flagged any non-blocking
+        # filler notes on this draft — safe to cut/tighten since it never
+        # touches the fixed opening paragraph or the bullets' substance.
+        if notes:
+            print("  (a) Trimming generic filler phrasing flagged in review notes...")
+            length_feedback = [
+                "Tighten or cut this generic filler phrasing (do not touch "
+                "the fixed opening paragraph, and do not shorten the three "
+                "skill bullets or drop their technical specifics). Do not "
+                "introduce any new specific technical claim, skill, or work "
+                "detail while rewording — only cut/tighten, don't "
+                "substitute in a new claim: " + note
+                for note in notes
+            ]
+            draft = generate(jd_fields, examples, instructions, resume, length_feedback=length_feedback)
+            passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+            draft, passed, issues, notes = _fix_content_if_failed(draft, passed, issues, notes)
+            filepath = _render(compact)
+            fits, pages = page_fit.check_page_fit(filepath)
+            print(f"      -> estimated {pages:.2f} page(s) after trimming filler")
+        else:
+            print("  (a) No generic-filler notes to trim — skipping to spacing.")
+
+        # (b) Tighten paragraph/line spacing and margins in the rendering
+        # step — a pure formatting change, doesn't touch the draft text.
+        if not fits:
+            print("  (b) Tightening paragraph spacing and margins...")
+            compact = True
+            filepath = _render(compact)
+            fits, pages = page_fit.check_page_fit(filepath)
+            print(f"      -> estimated {pages:.2f} page(s) after tightening spacing")
+
+        # (c) Last resort: lightly trim wording within sentences (bullets/
+        # closing), never whole sentences, never technical specifics.
+        if not fits:
+            print("  (c) Lightly trimming in-sentence wording as a last resort...")
+            length_feedback = [
+                "The letter is still a little over one page after trimming "
+                "filler and tightening spacing. Lightly tighten wording "
+                "WITHIN sentences in the three skill bullets and/or closing "
+                "paragraph(s) — trim wordy phrasing or redundant clauses "
+                "only. Do not delete whole sentences, do not remove "
+                "technical specifics or a bullet's closing company-bridge "
+                "sentence, and do not touch the fixed opening paragraph. Do "
+                "not introduce any new specific technical claim, skill, or "
+                "work detail while rewording — only cut/tighten existing "
+                "wording, don't substitute in a new claim."
+            ]
+            draft = generate(jd_fields, examples, instructions, resume, length_feedback=length_feedback)
+            passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+            draft, passed, issues, notes = _fix_content_if_failed(draft, passed, issues, notes)
+            filepath = _render(compact)
+            fits, pages = page_fit.check_page_fit(filepath)
+            print(f"      -> estimated {pages:.2f} page(s) after trimming wording")
+
+        if fits:
+            print("  -> now fits on one page.")
+        else:
+            print(
+                f"  WARNING: still estimated at {pages:.2f} pages after all "
+                "tightening steps. Double check it manually — it may run "
+                "slightly onto a second page."
+            )
+        print()
+
     print(f"Saved to {filepath}")
 
     return filepath

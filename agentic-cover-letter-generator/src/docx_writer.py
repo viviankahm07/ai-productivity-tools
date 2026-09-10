@@ -89,6 +89,17 @@ _REGULAR_SPACE_AFTER = Pt(10)  # role line, salutation, opening/closing paragrap
 _BULLET_SPACE_AFTER = Pt(8)  # slightly tighter between the three bullets
 _BULLET_LEFT_INDENT = Inches(0.5)
 _BULLET_FIRST_LINE_INDENT = Inches(-0.25)  # hanging indent, so wrapped lines align under the text, not the bullet
+_MARGIN = Inches(1)
+
+# Slightly tighter versions of the constants above, used when write_docx()
+# is called with compact=True — src/orchestrator.py's page-fit loop
+# (src/page_fit.py) reaches for this before touching the letter's actual
+# wording, per the standing rule that spacing gets tightened before
+# content gets cut. Deliberately "slight": still comfortably readable,
+# just denser than the default.
+_COMPACT_REGULAR_SPACE_AFTER = Pt(6)
+_COMPACT_BULLET_SPACE_AFTER = Pt(4)
+_COMPACT_MARGIN = Inches(0.85)
 
 
 def _iter_bold_spans(text: str):
@@ -237,6 +248,7 @@ def write_docx(
     linkedin_url: str | None = None,
     github_url: str | None = None,
     portfolio_url: str | None = None,
+    compact: bool = False,
 ) -> str:
     """Write `letter_text` to a .docx file in `output_dir`.
 
@@ -282,6 +294,13 @@ def write_docx(
         linkedin_url: LinkedIn profile URL, rendered as a hyperlink.
         github_url: GitHub profile URL, rendered as a hyperlink.
         portfolio_url: Portfolio URL, rendered as a hyperlink.
+        compact: If True, use slightly tighter paragraph spacing and
+            margins (see _COMPACT_* constants above) instead of the
+            defaults — src/orchestrator.py's page-fit loop sets this when
+            a letter runs a little over one page and trimming generic
+            filler wording alone wasn't enough to bring it back to one
+            page. Never shortens or drops any of the letter's own text;
+            purely a rendering-density change.
 
     Returns:
         The full filepath of the saved .docx file, as a string.
@@ -292,20 +311,24 @@ def write_docx(
     filename = f"{_sanitize(company)}_{_sanitize(role)}.docx"
     filepath = out_dir / filename
 
+    margin = _COMPACT_MARGIN if compact else _MARGIN
+    regular_space_after = _COMPACT_REGULAR_SPACE_AFTER if compact else _REGULAR_SPACE_AFTER
+    bullet_space_after = _COMPACT_BULLET_SPACE_AFTER if compact else _BULLET_SPACE_AFTER
+
     document = Document()
 
     section = document.sections[0]
-    section.top_margin = Inches(1)
-    section.bottom_margin = Inches(1)
-    section.left_margin = Inches(1)
-    section.right_margin = Inches(1)
+    section.top_margin = margin
+    section.bottom_margin = margin
+    section.left_margin = margin
+    section.right_margin = margin
 
     normal_style = document.styles["Normal"]
     normal_style.font.name = "Times New Roman"
     normal_style.font.size = Pt(11)
     normal_style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
     normal_style.paragraph_format.space_before = Pt(0)
-    normal_style.paragraph_format.space_after = _REGULAR_SPACE_AFTER
+    normal_style.paragraph_format.space_after = regular_space_after
 
     if full_name:
         _add_header(
@@ -330,7 +353,7 @@ def write_docx(
                 alignment=WD_ALIGN_PARAGRAPH.LEFT,
                 style="List Bullet",
                 space_before=Pt(0),
-                space_after=_BULLET_SPACE_AFTER,
+                space_after=bullet_space_after,
                 line_spacing=1.0,
                 left_indent=_BULLET_LEFT_INDENT,
                 first_line_indent=_BULLET_FIRST_LINE_INDENT,
@@ -340,7 +363,7 @@ def write_docx(
                 document,
                 line,
                 alignment=WD_ALIGN_PARAGRAPH.LEFT,
-                space_after=_TIGHT_SPACE_AFTER if is_tight else _REGULAR_SPACE_AFTER,
+                space_after=_TIGHT_SPACE_AFTER if is_tight else regular_space_after,
             )
 
     document.save(str(filepath))

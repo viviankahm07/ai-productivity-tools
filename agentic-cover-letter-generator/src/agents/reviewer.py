@@ -17,7 +17,7 @@ import config
 
 SYSTEM_PROMPT_TEMPLATE = """You are a strict quality-control rubric checker for cover letters. You are NOT an editor — do not rewrite, fix, or suggest replacement wording. Your only job is to identify problems and report them clearly enough that a separate drafting step can act on them.
 
-You will be given a cover letter draft, the job's company name, role title, and minimum requirements, the candidate's resume, and the full writing instructions the letter was supposed to follow.
+You will be given a cover letter draft, the job's company name, role title, and minimum requirements, the candidate's resume, the past cover letter examples that were used as reference material to draft this letter, and the full writing instructions the letter was supposed to follow.
 
 Check the draft against these criteria, in order:
 
@@ -26,7 +26,7 @@ Check the draft against these criteria, in order:
 3. Company name: The company name must be spelled and capitalized consistently everywhere it appears in the letter, matching the value given below exactly. Flag any inconsistency, typo, or mismatch, quoting the exact discrepancy.
 4. Minimum requirements coverage: Most of the listed minimum requirements should be addressed somewhere in the letter, even briefly. Flag any minimum requirement that seems completely unaddressed anywhere in the draft, naming that requirement exactly.
 5. Length: The letter should fit on one printed page under the candidate's standard formatting — roughly 500-650 words, given three full 5-6 sentence skill bullets plus header/date/salutation/opening/closing/sign-off. Flag it if it's clearly too short (e.g., bullets read as compressed to 2-3 sentences instead of 5-6, a bullet lacks concrete technical specifics, or a bullet is missing its closing bridge sentence to the target company) or clearly too long to fit one page. Do not flag a letter merely for being longer than a short/compressed letter would be — 500-650 words is the expected range for this format, not an upper limit to avoid.
-6. Skill/technology accuracy against resume: Any specific technical skill, tool, programming language, or technology claimed OR IMPLIED in the letter must be genuinely evidenced in the resume provided below. Flag any specific technical skill, tool, language, or technology referenced in the letter that doesn't appear in the resume, being specific about which ones (e.g. "The letter references experience with Lua and C++, which don't appear in the resume").
+6. Factual accuracy: Any specific technical skill, tool, programming language, technology, or concrete work detail (e.g. a specific system, workflow pattern, or project characteristic) claimed OR IMPLIED in the letter must be genuinely supported by the resume OR by the past cover letter examples provided below — either source is sufficient on its own; a claim is fine as long as at least one of the two backs it up. Flag a claim only if it is not supported by the resume AND not supported by any of the provided examples. Be specific about which claim and why, and name both sources you checked (e.g. "The letter references experience with Lua and C++, which don't appear in the resume or in any of the provided example letters").
 
 Additionally, check for one more thing, but report it separately as a note rather than an issue — it should never block the letter:
 
@@ -72,8 +72,21 @@ def _strip_code_fences(text: str) -> str:
     return text
 
 
-def _build_user_message(draft: str, jd_fields: dict, resume: str) -> str:
-    """Assemble the draft + the job fields + resume needed to check it."""
+def _format_examples(examples: list[str]) -> str:
+    """Render past example letters as clearly-labeled, numbered blocks.
+
+    Small, deliberate duplicate of src.agents.generator._format_examples —
+    kept local rather than imported so this module doesn't need to reach
+    into generator.py for a two-line helper.
+    """
+    if not examples:
+        return "(no past example letters provided)"
+    blocks = [f"--- Example {i} ---\n{example.strip()}" for i, example in enumerate(examples, start=1)]
+    return "\n\n".join(blocks)
+
+
+def _build_user_message(draft: str, jd_fields: dict, resume: str, examples: list[str]) -> str:
+    """Assemble the draft + the job fields + resume + examples needed to check it."""
     minimum = jd_fields.get("minimum_requirements", [])
     minimum_block = "\n".join(f"- {item}" for item in minimum) or "(none listed)"
 
@@ -85,9 +98,13 @@ Role title: {jd_fields.get("role_title", "")}
 Minimum requirements (check that most of these are addressed somewhere in the letter):
 {minimum_block}
 
---- Resume (check skill/technology claims in the draft against this) ---
+--- Resume (a valid source for criterion 6's factual-accuracy check) ---
 {resume}
 --- End of resume ---
+
+--- Past example letters (also a valid source for criterion 6 — a claim supported by either the resume or an example below is fine) ---
+{_format_examples(examples)}
+--- End of examples ---
 
 --- Draft ---
 {draft}
@@ -149,15 +166,17 @@ def _parse_reviewer_response(raw_text: str) -> tuple[bool, list[str], list[str]]
     return passed, issues, notes
 
 
-def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple[bool, list[str], list[str]]:
+def review(
+    draft: str, jd_fields: dict, instructions: str, resume: str, examples: list[str]
+) -> tuple[bool, list[str], list[str]]:
     """Review a cover letter draft for quality and adherence to instructions.
 
     Makes a single OpenAI API call that checks the draft as a strict rubric
     (fixed-sentence fidelity, role-title self-consistency, company-name
-    consistency, minimum-requirement coverage, length, skill/technology
-    accuracy against the resume) without rewriting anything itself. Generic
-    filler phrasing is also flagged, but as a non-blocking note rather than
-    an issue.
+    consistency, minimum-requirement coverage, length, factual accuracy
+    against the resume and past examples) without rewriting anything
+    itself. Generic filler phrasing is also flagged, but as a non-blocking
+    note rather than an issue.
 
     Args:
         draft: The cover letter draft text (from
@@ -167,8 +186,17 @@ def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple
             minimum_requirements, preferred_requirements).
         instructions: The user's cover letter writing instructions
             (contents of instructions.md).
-        resume: The candidate's resume text, used to check that any
-            skill/technology claims in the draft are genuinely supported.
+        resume: The candidate's resume text — one of two valid sources
+            (along with `examples`) used to check that any skill/
+            technology/work-detail claims in the draft are genuinely
+            supported; a claim backed by either source passes.
+        examples: The same past cover letter examples passed to
+            src.agents.generator.generate for this draft (from
+            src.retrieval.retrieve_similar). Real details from Vivian's
+            actual past experience sometimes don't fit on the resume for
+            space reasons but do appear in her past letters — a claim is
+            only flagged as unsupported if it's absent from BOTH the
+            resume and every example here.
 
     Returns:
         A tuple of (passed, issues, notes): `passed` is True if and only
@@ -195,7 +223,7 @@ def review(draft: str, jd_fields: dict, instructions: str, resume: str) -> tuple
                     "role": "system",
                     "content": SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
                 },
-                {"role": "user", "content": _build_user_message(draft, jd_fields, resume)},
+                {"role": "user", "content": _build_user_message(draft, jd_fields, resume, examples)},
             ],
         )
     except openai.APIError as exc:
@@ -268,13 +296,23 @@ Sincerely,
 
 Vivian Kahm"""
 
+    # Deliberately empty here: with no examples to fall back on, the
+    # Kubernetes claim above (criterion 6) can only be checked against the
+    # resume, and should still be flagged since it's absent from both. If
+    # a past example letter *did* mention e.g. "webhook-driven workflows"
+    # even though the resume doesn't, criterion 6 should NOT flag that —
+    # only claims missing from both sources should trip it.
+    sample_examples: list[str] = []
+
     if config.INSTRUCTIONS_PATH.exists():
         instructions_text = config.INSTRUCTIONS_PATH.read_text()
     else:
         instructions_text = "(no instructions.md found — using empty instructions for this test)"
 
     try:
-        passed, issues, notes = review(sample_draft, sample_jd_fields, instructions_text, sample_resume)
+        passed, issues, notes = review(
+            sample_draft, sample_jd_fields, instructions_text, sample_resume, sample_examples
+        )
     except ReviewerError as exc:
         print(f"ReviewerError: {exc}")
         sys.exit(1)

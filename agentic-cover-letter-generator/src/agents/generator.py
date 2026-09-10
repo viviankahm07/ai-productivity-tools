@@ -123,6 +123,7 @@ def _build_user_message(
     examples: list[str],
     resume: str,
     feedback: list[str] | None = None,
+    length_feedback: list[str] | None = None,
 ) -> str:
     """Assemble the job-specific content (fields, requirements, resume, examples)."""
     minimum = jd_fields.get("minimum_requirements", [])
@@ -162,6 +163,13 @@ Past example letters — for tone and structure reference only, do not copy thei
 This is a revision of a previous draft that failed review. Fix these specific issues:
 {feedback_block}"""
 
+    if length_feedback:
+        length_block = "\n".join(f"- {item}" for item in length_feedback)
+        message += f"""
+
+This is a revision of a previous draft that rendered a little over one printed page. Apply ONLY the length-reduction edit(s) below — do not touch the fixed opening paragraph, do not rewrite anything else, and unless an item below explicitly says otherwise, do not shorten the three skill bullets or drop their technical specifics or company-bridge sentences:
+{length_block}"""
+
     return message
 
 
@@ -171,6 +179,7 @@ def generate(
     instructions: str,
     resume: str,
     feedback: list[str] | None = None,
+    length_feedback: list[str] | None = None,
 ) -> str:
     """Draft a cover letter from the planned fields and retrieved examples.
 
@@ -196,6 +205,14 @@ def generate(
             src.agents.reviewer.review pass. When provided, appended to the
             prompt as a "Fix these specific issues:" section so this call
             revises the draft instead of writing one from scratch.
+        length_feedback: Optional list of specific length-reduction edits
+            from src.orchestrator's page-fit loop (src/page_fit.py), used
+            when a rendered draft came out a little over one printed page.
+            Distinct from `feedback` (rubric issues) — this is scoped
+            narrowly to page-fit edits only (trim generic filler, or, as a
+            last resort, lightly tighten wording within a sentence) and
+            explicitly forbids touching the fixed opening paragraph or
+            cutting bullet substance unless a specific item says otherwise.
 
     Returns:
         The drafted cover letter body text, with any markdown code fences
@@ -224,7 +241,9 @@ def generate(
                 },
                 {
                     "role": "user",
-                    "content": _build_user_message(jd_fields, examples, resume, feedback),
+                    "content": _build_user_message(
+                        jd_fields, examples, resume, feedback, length_feedback
+                    ),
                 },
             ],
         )
