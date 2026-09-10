@@ -4,8 +4,14 @@ An agentic CLI tool that drafts a tailored cover letter from a job posting.
 Give it a job URL (or raw job description text) and it fetches the posting,
 retrieves your most relevant past letters by embedding similarity, and runs
 a **Planner &rarr; Generator &rarr; Reviewer** pipeline of OpenAI API calls to
-produce a polished `.docx` draft — checked against your own resume and
-writing instructions so it doesn't invent experience you don't have.
+produce a polished `.docx` draft — fact-checked against your own resume and
+your retrieved past letters (either is a valid source, so a real detail that
+didn't make it onto the resume for space reasons still counts) and your
+writing instructions, so it doesn't invent experience you don't have. The
+final `.docx` is rendered to match a fixed personal format (bold centered
+name header, real bulleted skill sections with bold lead-in headers) and
+checked against a one-page-length estimate, tightening automatically if it
+runs long.
 
 This is plain Python orchestration — each stage is a separate `messages.create`
 call chained together in `src/orchestrator.py`, not a Claude Code / Agent SDK
@@ -24,10 +30,27 @@ workflow.
 4. **Generator** (`src/agents/generator.py`) — draft the letter using the
    plan, the retrieved past letters, your resume, and `instructions.md`.
 5. **Reviewer** (`src/agents/reviewer.py`) — check the draft against the plan,
-   resume, and instructions; flags issues that trigger one revise-and-retry
-   pass through the Generator.
-6. **docx writer** (`src/docx_writer.py`) — save the final letter as a
-   formatted `.docx` file in `output/`.
+   instructions, and a fixed rubric (fixed-sentence fidelity, role/company
+   consistency, minimum-requirement coverage, length, and factual accuracy).
+   The factual-accuracy check treats your resume and the same retrieved past
+   letters passed to the Generator as equally valid sources — a claim is
+   only flagged if it's unsupported by *both* — since a resume is dense by
+   design and can't list every detail your past letters cover. Flags trigger
+   one revise-and-retry pass through the Generator.
+6. **docx writer** (`src/docx_writer.py`) — render the final letter as a
+   `.docx` in `output/`, matching a fixed personal format: bold centered
+   name header, real Word bulleted-list formatting for each skill section
+   (not a typed "•"), and bold lead-in headers — decoding both literal
+   `**markdown**` and any stray Unicode "styled" lookalike characters a
+   model might substitute, so formatting renders correctly either way.
+7. **Page-fit check** (`src/page_fit.py`) — estimate whether the rendered
+   `.docx` fits on one printed page (word-wrapping simulated against real
+   font metrics, not just a word count). If it runs long, `orchestrator.py`
+   tightens it in order — trim generic filler phrasing, tighten rendering
+   spacing/margins, then lightly trim in-sentence wording as a last
+   resort — re-checking after each step and stopping as soon as it fits,
+   without shortening the three skill bullets' substance unless every
+   earlier step already failed.
 
 Wired together end to end in `src/orchestrator.py`.
 
@@ -98,6 +121,20 @@ python3 src/orchestrator.py "<job_url>"
 `<job_url>` can be a URL to a job posting, or raw job description text. The
 generated draft is written to `output/`. (`python main.py "<job_url>"` is
 equivalent and gives friendlier `--help` output.)
+
+## Notes
+
+- The model is set in `config.MODEL_NAME` (currently `gpt-5.6-sol`). It's a
+  reasoning model, so part of its output token budget goes to internal
+  reasoning before it writes any visible text — if you swap in a different
+  reasoning model and start seeing `GeneratorError`s about an empty
+  response, raise `MAX_COMPLETION_TOKENS` and/or lower `REASONING_EFFORT`
+  in `src/agents/generator.py`.
+- `src/page_fit.py`'s page-count estimate is exactly that — an estimate,
+  calibrated against a known one-page reference letter, not a real layout
+  engine (there's no Word/LibreOffice in this setup to render an exact
+  page count from). It's precise enough to drive the tightening loop, not
+  to promise an exact line count.
 
 ## What's excluded from this repo
 
