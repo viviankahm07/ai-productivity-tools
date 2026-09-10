@@ -75,11 +75,13 @@ If the draft is running long: tighten paragraph spacing and/or use a single-para
 
 You will be given past cover letters as examples. These are for tone, structure, and phrasing-style reference ONLY — do not copy their specific content, employers, or claims. Only use experience that is actually true for this candidate, per the instructions below and the candidate's real background.
 
-## Resume — technical accuracy
+## Resume and knowledge base — technical accuracy and source material
 
-You will also be given the candidate's resume. Any specific technical skill, tool, programming language, framework, or technology you mention in the letter must be evidenced in the resume — do not invent, exaggerate, or infer technical experience the candidate doesn't actually have. In particular, do NOT pull specific languages, frameworks, engines, or other named technologies out of the job posting and into the letter unless the resume shows the candidate has real experience with them — a technology being in the job posting is not evidence the candidate knows it. It's fine, and often better, to express genuine interest in the company's mission, product, or engineering culture broadly, without naming specific technologies the candidate hasn't actually used.
+You will also be given the candidate's resume and, when available, relevant sections of their knowledge base — a much more detailed, narrative background document (internship write-ups, project deep-dives, extracurriculars) than a one-page resume has room for. Any specific technical skill, tool, programming language, framework, technology, or concrete work detail you mention in the letter must be evidenced in the resume OR the knowledge base — either is a valid, trusted source on its own. Do not invent, exaggerate, or infer experience that appears in neither. In particular, do NOT pull specific languages, frameworks, engines, or other named technologies out of the job posting and into the letter unless the resume or knowledge base shows the candidate has real experience with them — a technology being in the job posting is not evidence the candidate knows it. It's fine, and often better, to express genuine interest in the company's mission, product, or engineering culture broadly, without naming specific technologies the candidate hasn't actually used.
 
-The resume's ONLY purpose here is fact-checking — confirming that a skill or technology you were already going to mention is real. It is not a content source: do not scan it for additional accomplishments, projects, or details to pad the letter with, and do not restate resume bullet points just because they're available in context. The letter's level of detail and overall length should match the example letters' style below, not the resume's level of detail — a resume is dense by design; a cover letter is not, and having the resume available is not a reason to make this letter longer or more detailed than the examples.
+Where the resume and knowledge base both describe the same experience, the knowledge base is the richer source — prefer it for concrete specifics (exact technologies, what you actually built, what went wrong, what you learned) rather than restating the resume's compressed bullet phrasing. But nothing in the letter should contradict the resume — if the knowledge base's framing of an experience conflicts with how the resume states it (scope, timeline, ownership), defer to the resume.
+
+The resume and knowledge base's purpose here is fact-checking and, for the knowledge base specifically, supplying richer specifics for content you were already going to include — not a content source to scan for additional accomplishments to pad the letter with. Do not restate resume bullet points or knowledge-base paragraphs just because they're available in context. The letter's level of detail and overall length should match the example letters' style below, not the resume's or knowledge base's level of detail — both are dense by design; a cover letter is not, and having them available is not a reason to make this letter longer or more detailed than the examples.
 
 ## Instructions for this candidate
 
@@ -122,10 +124,11 @@ def _build_user_message(
     jd_fields: dict,
     examples: list[str],
     resume: str,
+    knowledge_base: str = "",
     feedback: list[str] | None = None,
     length_feedback: list[str] | None = None,
 ) -> str:
-    """Assemble the job-specific content (fields, requirements, resume, examples)."""
+    """Assemble the job-specific content (fields, requirements, resume, KB, examples)."""
     minimum = jd_fields.get("minimum_requirements", [])
     preferred = jd_fields.get("preferred_requirements", [])
 
@@ -151,6 +154,10 @@ Preferred requirements (use selectively, only where they fit naturally):
 --- Resume (only name specific technical skills/tools/technologies that are evidenced here) ---
 {resume}
 --- End of resume ---
+
+--- Knowledge base (sections most relevant to this job; a richer, equally-trusted source alongside the resume — see the "Resume and knowledge base" section of your instructions) ---
+{knowledge_base or "(no knowledge base sections available for this job)"}
+--- End of knowledge base ---
 
 Past example letters — for tone and structure reference only, do not copy their specific content:
 
@@ -178,6 +185,7 @@ def generate(
     examples: list[str],
     instructions: str,
     resume: str,
+    knowledge_base: str = "",
     feedback: list[str] | None = None,
     length_feedback: list[str] | None = None,
 ) -> str:
@@ -186,8 +194,8 @@ def generate(
     Makes a single OpenAI API call to write a first-draft cover letter,
     combining the structured job description fields, similar past letters
     as style/content reference, and the user's writing instructions. The
-    resume is used to keep technical claims honest — see the "Resume —
-    technical accuracy" section of SYSTEM_PROMPT_TEMPLATE.
+    resume and knowledge base are used to keep technical claims honest —
+    see the "Resume and knowledge base" section of SYSTEM_PROMPT_TEMPLATE.
 
     Args:
         jd_fields: Structured job description fields produced by
@@ -199,8 +207,15 @@ def generate(
             (contents of instructions.md).
         resume: The candidate's resume text. Any specific technical skill,
             tool, language, or technology named in the letter must be
-            evidenced here — technologies pulled from the job posting
-            alone are not a valid basis for a claim.
+            evidenced here or in `knowledge_base` — technologies pulled
+            from the job posting alone are not a valid basis for a claim.
+        knowledge_base: The knowledge-base sections most relevant to this
+            job (from src.knowledge_base.retrieve_relevant_sections), or
+            an empty string if knowledge_base.md doesn't exist — entirely
+            optional, richer background material alongside the resume; the
+            same trust level, just deeper. Preferred for concrete specifics
+            when it and the resume cover the same experience, but must
+            never contradict the resume.
         feedback: Optional list of specific issues from a prior
             src.agents.reviewer.review pass. When provided, appended to the
             prompt as a "Fix these specific issues:" section so this call
@@ -242,7 +257,7 @@ def generate(
                 {
                     "role": "user",
                     "content": _build_user_message(
-                        jd_fields, examples, resume, feedback, length_feedback
+                        jd_fields, examples, resume, knowledge_base, feedback, length_feedback
                     ),
                 },
             ],

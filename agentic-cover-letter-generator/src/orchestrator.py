@@ -13,6 +13,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 import config
+from src import knowledge_base as kb
 from src import page_fit, retrieval
 from src.agents.generator import generate
 from src.agents.planner import plan
@@ -24,11 +25,12 @@ from src.ingest import IngestError, fetch_job_posting
 def run_pipeline(job_url_or_text: str) -> str:
     """Run the full cover letter generation pipeline end to end.
 
-    Steps: ingest -> planner -> retrieval -> generator -> reviewer -> (one
-    revise-and-retry pass on failure) -> docx_writer -> page-fit check ->
-    (up to three escalating tightening passes: trim generic filler, tighten
-    rendering spacing/margins, lightly trim in-sentence wording — each
-    re-checked, stopping as soon as it fits).
+    Steps: ingest -> planner -> retrieval (example letters + knowledge-base
+    sections) -> generator -> reviewer -> (one revise-and-retry pass on
+    failure) -> docx_writer -> page-fit check -> (up to three escalating
+    tightening passes: trim generic filler, tighten rendering
+    spacing/margins, lightly trim in-sentence wording — each re-checked,
+    stopping as soon as it fits).
     Prints a step-by-step progress log throughout, since a full run can
     take 15-30 seconds across several API calls.
 
@@ -102,11 +104,25 @@ def run_pipeline(job_url_or_text: str) -> str:
     examples = retrieval.retrieve_similar(jd_text, jd_fields["role_type"], k=3)
     print(f"  -> using {len(examples)} example letter(s)")
 
+    print("Loading knowledge base...")
+    if config.KNOWLEDGE_BASE_PATH.exists():
+        knowledge_base_text = kb.retrieve_relevant_sections(jd_text)
+        # Each retrieved section renders as its own "--- Heading ---" block
+        # header line (see kb.retrieve_relevant_sections) — counting those
+        # is simpler than re-deriving the count from kb's internals here.
+        section_count = sum(
+            1 for line in knowledge_base_text.splitlines() if line.startswith("--- ")
+        )
+        print(f"  -> using {section_count} relevant section(s) from {config.KNOWLEDGE_BASE_PATH.name}")
+    else:
+        knowledge_base_text = ""
+        print(f"  -> {config.KNOWLEDGE_BASE_PATH.name} not found, skipping (optional)")
+
     print("Generating draft...")
-    draft = generate(jd_fields, examples, instructions, resume)
+    draft = generate(jd_fields, examples, instructions, resume, knowledge_base_text)
 
     print("Reviewing...")
-    passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+    passed, issues, notes = review(draft, jd_fields, instructions, resume, knowledge_base_text, examples)
 
     if not passed:
         print("Review found issues on the first draft:")
@@ -114,10 +130,10 @@ def run_pipeline(job_url_or_text: str) -> str:
             print(f"  - {issue}")
 
         print("Regenerating with feedback...")
-        draft = generate(jd_fields, examples, instructions, resume, feedback=issues)
+        draft = generate(jd_fields, examples, instructions, resume, knowledge_base_text, feedback=issues)
 
         print("Reviewing revised draft...")
-        passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+        passed, issues, notes = review(draft, jd_fields, instructions, resume, knowledge_base_text, examples)
 
     if passed:
         print("Draft passed review.")
@@ -151,8 +167,8 @@ def run_pipeline(job_url_or_text: str) -> str:
         if passed:
             return draft, passed, issues, notes
         print("      Content issues found after the trim — attempting one fix pass...")
-        draft = generate(jd_fields, examples, instructions, resume, feedback=issues)
-        passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+        draft = generate(jd_fields, examples, instructions, resume, knowledge_base_text, feedback=issues)
+        passed, issues, notes = review(draft, jd_fields, instructions, resume, knowledge_base_text, examples)
         if not passed:
             print("      WARNING: still did not pass review after the fix pass. Remaining issues:")
             for issue in issues:
@@ -203,8 +219,11 @@ def run_pipeline(job_url_or_text: str) -> str:
                 "substitute in a new claim: " + note
                 for note in notes
             ]
-            draft = generate(jd_fields, examples, instructions, resume, length_feedback=length_feedback)
-            passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+            draft = generate(
+                jd_fields, examples, instructions, resume, knowledge_base_text,
+                length_feedback=length_feedback,
+            )
+            passed, issues, notes = review(draft, jd_fields, instructions, resume, knowledge_base_text, examples)
             draft, passed, issues, notes = _fix_content_if_failed(draft, passed, issues, notes)
             filepath = _render(compact)
             fits, pages = page_fit.check_page_fit(filepath)
@@ -237,8 +256,11 @@ def run_pipeline(job_url_or_text: str) -> str:
                 "work detail while rewording — only cut/tighten existing "
                 "wording, don't substitute in a new claim."
             ]
-            draft = generate(jd_fields, examples, instructions, resume, length_feedback=length_feedback)
-            passed, issues, notes = review(draft, jd_fields, instructions, resume, examples)
+            draft = generate(
+                jd_fields, examples, instructions, resume, knowledge_base_text,
+                length_feedback=length_feedback,
+            )
+            passed, issues, notes = review(draft, jd_fields, instructions, resume, knowledge_base_text, examples)
             draft, passed, issues, notes = _fix_content_if_failed(draft, passed, issues, notes)
             filepath = _render(compact)
             fits, pages = page_fit.check_page_fit(filepath)

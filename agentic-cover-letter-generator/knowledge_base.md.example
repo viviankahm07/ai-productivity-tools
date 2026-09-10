@@ -1,0 +1,69 @@
+<!--
+Copy this file to knowledge_base.md (already git-ignored) and fill in your
+own detailed background. This file is optional — src/orchestrator.py skips
+it gracefully if it doesn't exist — but if present, src/knowledge_base.py
+parses it and retrieves the sections most relevant to each job, passing
+them to the Generator and Reviewer as an equally-trusted, richer source
+alongside your resume.
+
+Despite the .md extension (kept consistent with resume.md/instructions.md
+for this project's file-naming convention), this file is parsed as real
+HTML: src/knowledge_base.py splits it into sections at <h2>/<h3>/<h4>
+boundaries, so the section headers below aren't just visual — they define
+the retrievable chunks. Keep that structure (one <h2>/<h3>/<h4> per
+distinct experience/project) rather than flattening everything into plain
+paragraphs, or retrieval will treat your whole document as one giant
+section.
+
+Unlike the resumes (resume_swe.md, resume_swe_finance.md,
+resume_swe_business.md), this file is NOT split by role_type — write one
+knowledge_base.md covering everything, and let retrieval pick the
+sections relevant to each specific job.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Your Name — Professional Background Knowledge Base</title>
+</head>
+<body>
+<main>
+
+<h1>Your Name — Professional Background Knowledge Base</h1>
+
+<h2>Purpose of This Document</h2>
+
+<p>This document is a detailed source of truth for cover-letter generation and other professional writing. Unlike a one-page resume, it preserves the context behind each experience: what problem you were solving, how you approached it technically, what you personally contributed, what you learned, and what you'd do differently now. It should not be expected to appear in full in any single letter — a retrieval step selects only the sections relevant to a given job.</p>
+
+<h2>Academic and Technical Background</h2>
+
+<p>A paragraph or two on your degree, relevant coursework, and the technologies/languages you've worked with across your experience — similar to a resume's skills section, but with room to say <em>why</em> each area interests you.</p>
+
+<h2>Professional Experience</h2>
+
+<h3>Example Corp — Software Engineering Intern</h3>
+<p><strong>City, State</strong></p>
+
+<p>A detailed narrative write-up of this internship: the problem you worked on, the technical approach, your specific contributions, a genuine challenge you ran into and how you handled it, and what you'd do differently if you did it again. Concrete specifics (actual technologies, actual numbers, actual tradeoffs) are what make this useful as fact-checking material later — vague summary language belongs on the resume, not here.</p>
+
+<h2>Technical and Quantitative Projects</h2>
+
+<h3>Example Project Name</h3>
+<p><strong>Python, FastAPI, PostgreSQL</strong></p>
+
+<p>Same idea as above, applied to a personal or academic project: what you built, why, the hardest part, and what you learned.</p>
+
+<h2>Extracurriculars and Organizations</h2>
+
+<h3>Example Club or Organization</h3>
+<p><strong>Your Role</strong></p>
+
+<p>What the organization does and what you specifically contributed — useful grounding for letters where a role values leadership, collaboration, or a specific domain interest beyond pure technical work.</p>
+
+<h2>Cross-Experience Themes</h2>
+
+<p>A closing section tying your experiences together — recurring interests, a consistent approach to problems, or a throughline across otherwise-unrelated work. This section tends to retrieve well for almost any job, since it's about you broadly rather than one specific experience.</p>
+
+</main>
+</body>
+</html>

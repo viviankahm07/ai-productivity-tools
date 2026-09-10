@@ -40,6 +40,21 @@ ROLE_TYPES_PATH = EXAMPLES_DIR / "role_types.json"
 # recomputed on every call. Already gitignored (.embeddings_cache/).
 EMBEDDINGS_CACHE_PATH = BASE_DIR / ".embeddings_cache" / "cache.pkl"
 
+# Optional, single, unified background document — richer narrative
+# write-ups of internships/projects/extracurriculars than a resume has
+# room for. Unlike the role-specific resumes below, it's not split by
+# role_type: src/knowledge_base.py retrieves the sections most relevant to
+# each job from the one file, regardless of the classified role_type.
+# Entirely optional — src/orchestrator.py skips this step gracefully if
+# the file doesn't exist yet. Gitignored, same as the resumes/instructions.
+KNOWLEDGE_BASE_PATH = BASE_DIR / "knowledge_base.md"
+
+# Where src/knowledge_base.py caches section embeddings, mirroring
+# EMBEDDINGS_CACHE_PATH above but kept in its own file since it embeds a
+# different set of texts (knowledge_base.md's sections, not example
+# letters) and is invalidated by a different mtime.
+KNOWLEDGE_BASE_CACHE_PATH = BASE_DIR / ".embeddings_cache" / "knowledge_base_cache.pkl"
+
 # Role-specific resumes (plain text/markdown) used by the generator and
 # reviewer agents to keep skill/technology claims honest — one per
 # src.agents.planner.VALID_ROLE_TYPES value, so each letter is fact-checked

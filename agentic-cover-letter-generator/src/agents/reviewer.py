@@ -17,7 +17,7 @@ import config
 
 SYSTEM_PROMPT_TEMPLATE = """You are a strict quality-control rubric checker for cover letters. You are NOT an editor — do not rewrite, fix, or suggest replacement wording. Your only job is to identify problems and report them clearly enough that a separate drafting step can act on them.
 
-You will be given a cover letter draft, the job's company name, role title, and minimum requirements, the candidate's resume, the past cover letter examples that were used as reference material to draft this letter, and the full writing instructions the letter was supposed to follow.
+You will be given a cover letter draft, the job's company name, role title, and minimum requirements, the candidate's resume, the candidate's knowledge base (a richer, narrative background document — may be empty if none was available for this job), the past cover letter examples that were used as reference material to draft this letter, and the full writing instructions the letter was supposed to follow.
 
 Check the draft against these criteria, in order:
 
@@ -26,7 +26,7 @@ Check the draft against these criteria, in order:
 3. Company name: The company name must be spelled and capitalized consistently everywhere it appears in the letter, matching the value given below exactly. Flag any inconsistency, typo, or mismatch, quoting the exact discrepancy.
 4. Minimum requirements coverage: Most of the listed minimum requirements should be addressed somewhere in the letter, even briefly. Flag any minimum requirement that seems completely unaddressed anywhere in the draft, naming that requirement exactly.
 5. Length: The letter should fit on one printed page under the candidate's standard formatting — roughly 500-650 words, given three full 5-6 sentence skill bullets plus header/date/salutation/opening/closing/sign-off. Flag it if it's clearly too short (e.g., bullets read as compressed to 2-3 sentences instead of 5-6, a bullet lacks concrete technical specifics, or a bullet is missing its closing bridge sentence to the target company) or clearly too long to fit one page. Do not flag a letter merely for being longer than a short/compressed letter would be — 500-650 words is the expected range for this format, not an upper limit to avoid.
-6. Factual accuracy: Any specific technical skill, tool, programming language, technology, or concrete work detail (e.g. a specific system, workflow pattern, or project characteristic) claimed OR IMPLIED in the letter must be genuinely supported by the resume OR by the past cover letter examples provided below — either source is sufficient on its own; a claim is fine as long as at least one of the two backs it up. Flag a claim only if it is not supported by the resume AND not supported by any of the provided examples. Be specific about which claim and why, and name both sources you checked (e.g. "The letter references experience with Lua and C++, which don't appear in the resume or in any of the provided example letters").
+6. Factual accuracy: Any specific technical skill, tool, programming language, technology, or concrete work detail (e.g. a specific system, workflow pattern, or project characteristic) claimed OR IMPLIED in the letter must be genuinely supported by the resume, the knowledge base, OR the past cover letter examples provided below — any one of the three is sufficient on its own; a claim is fine as long as at least one of them backs it up. Flag a claim only if it is unsupported by all three. Be specific about which claim and why, and name all three sources you checked (e.g. "The letter references experience with Lua and C++, which don't appear in the resume, the knowledge base, or any of the provided example letters").
 
 Additionally, check for one more thing, but report it separately as a note rather than an issue — it should never block the letter:
 
@@ -85,8 +85,10 @@ def _format_examples(examples: list[str]) -> str:
     return "\n\n".join(blocks)
 
 
-def _build_user_message(draft: str, jd_fields: dict, resume: str, examples: list[str]) -> str:
-    """Assemble the draft + the job fields + resume + examples needed to check it."""
+def _build_user_message(
+    draft: str, jd_fields: dict, resume: str, knowledge_base: str, examples: list[str]
+) -> str:
+    """Assemble the draft + the job fields + resume + KB + examples needed to check it."""
     minimum = jd_fields.get("minimum_requirements", [])
     minimum_block = "\n".join(f"- {item}" for item in minimum) or "(none listed)"
 
@@ -102,7 +104,11 @@ Minimum requirements (check that most of these are addressed somewhere in the le
 {resume}
 --- End of resume ---
 
---- Past example letters (also a valid source for criterion 6 — a claim supported by either the resume or an example below is fine) ---
+--- Knowledge base (also a valid source for criterion 6 — the same sections given to the Generator; may be empty if none was available) ---
+{knowledge_base or "(no knowledge base sections available for this job)"}
+--- End of knowledge base ---
+
+--- Past example letters (also a valid source for criterion 6 — a claim supported by any one of the resume, knowledge base, or an example below is fine) ---
 {_format_examples(examples)}
 --- End of examples ---
 
@@ -167,16 +173,21 @@ def _parse_reviewer_response(raw_text: str) -> tuple[bool, list[str], list[str]]
 
 
 def review(
-    draft: str, jd_fields: dict, instructions: str, resume: str, examples: list[str]
+    draft: str,
+    jd_fields: dict,
+    instructions: str,
+    resume: str,
+    knowledge_base: str,
+    examples: list[str],
 ) -> tuple[bool, list[str], list[str]]:
     """Review a cover letter draft for quality and adherence to instructions.
 
     Makes a single OpenAI API call that checks the draft as a strict rubric
     (fixed-sentence fidelity, role-title self-consistency, company-name
     consistency, minimum-requirement coverage, length, factual accuracy
-    against the resume and past examples) without rewriting anything
-    itself. Generic filler phrasing is also flagged, but as a non-blocking
-    note rather than an issue.
+    against the resume, knowledge base, and past examples) without
+    rewriting anything itself. Generic filler phrasing is also flagged,
+    but as a non-blocking note rather than an issue.
 
     Args:
         draft: The cover letter draft text (from
@@ -186,17 +197,24 @@ def review(
             minimum_requirements, preferred_requirements).
         instructions: The user's cover letter writing instructions
             (contents of instructions.md).
-        resume: The candidate's resume text — one of two valid sources
-            (along with `examples`) used to check that any skill/
-            technology/work-detail claims in the draft are genuinely
-            supported; a claim backed by either source passes.
+        resume: The candidate's resume text — one of three valid sources
+            (along with `knowledge_base` and `examples`) used to check
+            that any skill/technology/work-detail claims in the draft are
+            genuinely supported; a claim backed by any one of the three
+            passes.
+        knowledge_base: The same knowledge-base sections passed to
+            src.agents.generator.generate for this draft (from
+            src.knowledge_base.retrieve_relevant_sections), or an empty
+            string if knowledge_base.md doesn't exist. A claim is only
+            flagged as unsupported if it's absent from the resume, this,
+            AND every example below.
         examples: The same past cover letter examples passed to
             src.agents.generator.generate for this draft (from
             src.retrieval.retrieve_similar). Real details from Vivian's
             actual past experience sometimes don't fit on the resume for
-            space reasons but do appear in her past letters — a claim is
-            only flagged as unsupported if it's absent from BOTH the
-            resume and every example here.
+            space reasons but do appear in her past letters or knowledge
+            base — a claim is only flagged as unsupported if it's absent
+            from all three sources.
 
     Returns:
         A tuple of (passed, issues, notes): `passed` is True if and only
@@ -223,7 +241,12 @@ def review(
                     "role": "system",
                     "content": SYSTEM_PROMPT_TEMPLATE.format(instructions=instructions),
                 },
-                {"role": "user", "content": _build_user_message(draft, jd_fields, resume, examples)},
+                {
+                    "role": "user",
+                    "content": _build_user_message(
+                        draft, jd_fields, resume, knowledge_base, examples
+                    ),
+                },
             ],
         )
     except openai.APIError as exc:
@@ -296,12 +319,14 @@ Sincerely,
 
 Vivian Kahm"""
 
-    # Deliberately empty here: with no examples to fall back on, the
-    # Kubernetes claim above (criterion 6) can only be checked against the
-    # resume, and should still be flagged since it's absent from both. If
-    # a past example letter *did* mention e.g. "webhook-driven workflows"
-    # even though the resume doesn't, criterion 6 should NOT flag that —
-    # only claims missing from both sources should trip it.
+    # Deliberately empty here: with no examples or knowledge base to fall
+    # back on, the Kubernetes claim above (criterion 6) can only be
+    # checked against the resume, and should still be flagged since it's
+    # absent from all three. If a past example letter or the knowledge
+    # base *did* mention e.g. "webhook-driven workflows" even though the
+    # resume doesn't, criterion 6 should NOT flag that — only claims
+    # missing from all three sources should trip it.
+    sample_knowledge_base = ""
     sample_examples: list[str] = []
 
     if config.INSTRUCTIONS_PATH.exists():
@@ -311,7 +336,12 @@ Vivian Kahm"""
 
     try:
         passed, issues, notes = review(
-            sample_draft, sample_jd_fields, instructions_text, sample_resume, sample_examples
+            sample_draft,
+            sample_jd_fields,
+            instructions_text,
+            sample_resume,
+            sample_knowledge_base,
+            sample_examples,
         )
     except ReviewerError as exc:
         print(f"ReviewerError: {exc}")

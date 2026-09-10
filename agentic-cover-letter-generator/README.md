@@ -4,14 +4,14 @@ An agentic CLI tool that drafts a tailored cover letter from a job posting.
 Give it a job URL (or raw job description text) and it fetches the posting,
 retrieves your most relevant past letters by embedding similarity, and runs
 a **Planner &rarr; Generator &rarr; Reviewer** pipeline of OpenAI API calls to
-produce a polished `.docx` draft — fact-checked against your own resume and
-your retrieved past letters (either is a valid source, so a real detail that
-didn't make it onto the resume for space reasons still counts) and your
-writing instructions, so it doesn't invent experience you don't have. The
-final `.docx` is rendered to match a fixed personal format (bold centered
-name header, real bulleted skill sections with bold lead-in headers) and
-checked against a one-page-length estimate, tightening automatically if it
-runs long.
+produce a polished `.docx` draft — fact-checked against your own resume, an
+optional richer knowledge base, and your retrieved past letters (any one of
+the three is a valid source, so a real detail that didn't make it onto the
+resume for space reasons still counts) and your writing instructions, so it
+doesn't invent experience you don't have. The final `.docx` is rendered to
+match a fixed personal format (bold centered name header, real bulleted
+skill sections with bold lead-in headers) and checked against a
+one-page-length estimate, tightening automatically if it runs long.
 
 This is plain Python orchestration — each stage is a separate `messages.create`
 call chained together in `src/orchestrator.py`, not a Claude Code / Agent SDK
@@ -25,25 +25,32 @@ workflow.
    `examples/` with `sentence-transformers`, cache the embeddings, and pull
    the ones most similar to the current job description (boosted by a
    `role_types.json` role-type match).
-3. **Planner** (`src/agents/planner.py`) — extract structured fields (company,
+3. **Knowledge base retrieval** (`src/knowledge_base.py`, optional) — if
+   `knowledge_base.md` exists, parse it into sections (see below) and
+   retrieve the ones most relevant to the current job description, the
+   same way `src/retrieval.py` retrieves past letters. Skipped gracefully
+   (empty string, no error) if the file doesn't exist.
+4. **Planner** (`src/agents/planner.py`) — extract structured fields (company,
    role title, role type, key requirements) from the job description.
-4. **Generator** (`src/agents/generator.py`) — draft the letter using the
-   plan, the retrieved past letters, your resume, and `instructions.md`.
-5. **Reviewer** (`src/agents/reviewer.py`) — check the draft against the plan,
+5. **Generator** (`src/agents/generator.py`) — draft the letter using the
+   plan, the retrieved past letters, your resume, the retrieved knowledge-
+   base sections, and `instructions.md`.
+6. **Reviewer** (`src/agents/reviewer.py`) — check the draft against the plan,
    instructions, and a fixed rubric (fixed-sentence fidelity, role/company
    consistency, minimum-requirement coverage, length, and factual accuracy).
-   The factual-accuracy check treats your resume and the same retrieved past
-   letters passed to the Generator as equally valid sources — a claim is
-   only flagged if it's unsupported by *both* — since a resume is dense by
-   design and can't list every detail your past letters cover. Flags trigger
-   one revise-and-retry pass through the Generator.
-6. **docx writer** (`src/docx_writer.py`) — render the final letter as a
+   The factual-accuracy check treats your resume, the same retrieved
+   knowledge-base sections, and the same retrieved past letters passed to
+   the Generator as equally valid sources — a claim is only flagged if
+   it's unsupported by *all three* — since a resume is dense by design and
+   can't list every detail your past letters or knowledge base cover.
+   Flags trigger one revise-and-retry pass through the Generator.
+7. **docx writer** (`src/docx_writer.py`) — render the final letter as a
    `.docx` in `output/`, matching a fixed personal format: bold centered
    name header, real Word bulleted-list formatting for each skill section
    (not a typed "•"), and bold lead-in headers — decoding both literal
    `**markdown**` and any stray Unicode "styled" lookalike characters a
    model might substitute, so formatting renders correctly either way.
-7. **Page-fit check** (`src/page_fit.py`) — estimate whether the rendered
+8. **Page-fit check** (`src/page_fit.py`) — estimate whether the rendered
    `.docx` fits on one printed page (word-wrapping simulated against real
    font metrics, not just a word count). If it runs long, `orchestrator.py`
    tightens it in order — trim generic filler phrasing, tighten rendering
@@ -102,6 +109,16 @@ cp instructions.md.example instructions.md
 cp examples/sample_letter.txt.example examples/your_company.txt
 # then edit it, and add a matching entry to examples/role_types.json,
 # e.g. {"your_company.txt": "swe"} — see examples/README.md for the format
+
+# optional: a single, unified, richer background document — not split by
+# role_type, unlike the resumes above. src/knowledge_base.py retrieves
+# the sections most relevant to each job and passes them to the
+# Generator/Reviewer as an equally-trusted, deeper source alongside your
+# resume. Skipped gracefully if you don't create this file.
+cp knowledge_base.md.example knowledge_base.md
+# then edit it with your real background — keep the <h2>/<h3>/<h4>
+# section-header structure, since that's what defines the retrievable
+# chunks (see the comment at the top of the file)
 ```
 
 The pipeline classifies each job posting's `role_type` before picking a
@@ -124,6 +141,18 @@ equivalent and gives friendlier `--help` output.)
 
 ## Notes
 
+- `knowledge_base.md` is parsed as real HTML despite the `.md` extension
+  (kept consistent with the resume/instructions naming convention) —
+  `src/knowledge_base.py` splits it into retrievable sections at its
+  `<h2>`/`<h3>`/`<h4>` boundaries. At roughly 8,000 words for the reference
+  document this was built against — larger than the resume and all
+  retrieved example letters combined — sending the whole file into every
+  Generator/Reviewer call would meaningfully bloat every prompt with
+  mostly irrelevant material, since any single letter only draws on a
+  handful of sections. So this reuses `src/retrieval.py`'s
+  sentence-transformers approach to retrieve only the most relevant
+  sections per job (`kb.DEFAULT_K = 6`), rather than embedding the file in
+  full on every call.
 - The model is set in `config.MODEL_NAME` (currently `gpt-5.6-sol`). It's a
   reasoning model, so part of its output token budget goes to internal
   reasoning before it writes any visible text — if you swap in a different
@@ -140,11 +169,13 @@ equivalent and gives friendlier `--help` output.)
 
 `resume_swe.md`, `resume_swe_finance.md`, `resume_swe_business.md` (and
 their `.txt` counterparts, and the generic `resume.md`/`resume.txt`
-fallback), `instructions.md`, and every real letter in `examples/`
-(including `examples/role_types.json`) are gitignored — they contain real
-personal information: your name, contact details, employers, and the
-companies you've actually applied to. Only their `.example` counterparts
-(`resume.md.example`, `instructions.md.example`,
-`examples/sample_letter.txt.example`) are tracked, showing the expected
-format with fictional placeholder content. `output/` (your generated
-letters) and `.env` (your API key) are gitignored the same way.
+fallback), `instructions.md`, `knowledge_base.md`, and every real letter in
+`examples/` (including `examples/role_types.json`) are gitignored — they
+contain real personal information: your name, contact details, employers,
+and the companies you've actually applied to. Only their `.example`
+counterparts (`resume.md.example`, `instructions.md.example`,
+`knowledge_base.md.example`, `examples/sample_letter.txt.example`) are
+tracked, showing the expected format with fictional placeholder content.
+`output/` (your generated letters), `.embeddings_cache/` (cached
+embeddings for both past letters and knowledge-base sections), and `.env`
+(your API key) are gitignored the same way.
