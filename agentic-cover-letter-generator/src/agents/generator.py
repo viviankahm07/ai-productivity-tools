@@ -45,7 +45,15 @@ SYSTEM_PROMPT_TEMPLATE = """You are a cover letter writer. Draft a complete cove
 
 ## Output format
 
-Return ONLY the finished letter text, ready to hand off as-is. Do not include a preamble, a note to the user, or any markdown formatting — no code fences, no headers, no bullet asterisks unless the instructions explicitly call for bulleted/indented content.
+Return ONLY the finished letter text, ready to hand off as-is. Do not include a preamble, a note to the user, or any code fences.
+
+One explicit exception to "no markdown": each bullet's lead-in header uses literal double-asterisk markdown — `**Header text:**` — exactly as instructions.md specifies. This is required, not optional. Do NOT substitute Unicode "styled"/stylized bold or italic lookalike characters (e.g. writing "𝗣𝘆𝘁𝗵𝗼𝗻" instead of "Python") to fake a bold appearance — those are not real bold formatting, will not render as bold in the final document, and show up as garbled-looking plain text instead. Use plain ASCII text everywhere except the literal `**...**` markers themselves.
+
+Do NOT type a manual bullet character ("•", "-", "*", etc.) at the start of a bullet line — the rendering step adds a real bulleted-list marker automatically. Each bullet line should start directly with its `**Bolded header:**`.
+
+Separate every logical block — date, role name, salutation, opening paragraph, each of the three bullets, each closing paragraph, and the sign-off — with a blank line in your raw output. Do not run multiple blocks together on consecutive lines with no blank line between them; the rendering step depends on blank-line separation to apply correct paragraph spacing, bullet formatting, and bold headers. (One exception: no blank line between "Sincerely," and the name on the next line — those two stay adjacent.)
+
+Write in clean, direct prose — no em dashes (—) or other overly stylistic punctuation.
 
 Do NOT write the name-and-contact-info header block yourself, even if the instructions describe one (e.g. a centered name and a contact line with phone/email/LinkedIn/GitHub/portfolio). That block is generated separately and inserted programmatically after your output — a real document can give it hyperlinks and font sizing that plain text can't, so if you also write it, it will appear twice in the final letter. Start your output at whatever comes right after that header — typically the date and role-name lines — and continue through the salutation, body, and closing exactly as the instructions describe.
 
@@ -59,7 +67,9 @@ You will be given two lists of requirements extracted from the job posting: mini
 
 ## Length
 
-The letter must stay within the same length range as the example letters below — roughly 14-23 lines. This is a hard ceiling, not a suggestion. If explicitly addressing every minimum requirement would push the letter past that range, do NOT lengthen the letter to fit them all in — instead prioritize the 2-3 minimum requirements that most meaningfully differentiate this candidate's fit, address those, and leave the rest implicit (per the guidance above) or unaddressed. A shorter letter that reads naturally beats a longer one that covers every requirement explicitly.
+The letter must fit on one printed page under the formatting instructions.md specifies. With three full 5-6 sentence bullets (per instructions.md's bullet-length requirement), that's roughly 500-650 words total — meaningfully longer than a short, compressed letter, but still one page. The hard ceiling is one page, not a specific word count — the word count above is just what one page comfortably holds under this formatting.
+
+If the draft is running long: tighten paragraph spacing and/or use a single-paragraph closing instead of two before shortening anything else. Do NOT shorten the three skill bullets or drop their technical specifics to save space — that's the last thing to cut, not the first. If explicitly addressing every minimum requirement would still push the letter past one page after that, prioritize the 2-3 minimum requirements that most meaningfully differentiate this candidate's fit, address those, and leave the rest implicit (per the guidance above) or unaddressed.
 
 ## Reference examples
 

@@ -1,6 +1,8 @@
 """Write the final cover letter draft to a .docx file."""
 
+import itertools
 import re
+import unicodedata
 from pathlib import Path
 
 from docx import Document
@@ -61,30 +63,134 @@ def _add_hyperlink(paragraph, url: str, text: str, color: str = "000000") -> Non
     paragraph._p.append(hyperlink)
 
 
-_BOLD_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+_BOLD_MARKDOWN_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+
+# Unicode "Mathematical Alphanumeric Symbols" block — bold/italic/bold-italic/
+# sans/bold-sans/monospace/script/fraktur/double-struck Latin-letter
+# lookalikes (e.g. "𝗣𝘆𝘁𝗵𝗼𝗻" for "Python"). Observed in practice (gpt-5.6-sol,
+# on this pipeline) as a workaround the model reaches for to fake bold
+# emphasis when a prompt discourages markdown without carving out an
+# explicit bold exception. NFKC normalization decodes these back to plain
+# ASCII; see _iter_bold_spans().
+_STYLED_LETTER_RANGE = range(0x1D400, 0x1D7FF + 1)
+
+# A bullet line may still arrive with a stray manual marker despite
+# instructions.md telling the model not to add one — stripped defensively
+# by _strip_leading_bullet_marker(). Deliberately does NOT match "**"
+# (markdown bold) or "--".
+_LEADING_BULLET_MARKER = re.compile(r"^(?:[•●▪]|-(?!-)|\*(?!\*))\s+")
+
+# Paragraph spacing, tuned to match the candidate's established reference
+# letter format (a real Word doc with a bold centered name, three bolded
+# bullets with visible breathing room, and a tight sign-off) rather than
+# python-docx's defaults.
+_TIGHT_SPACE_AFTER = Pt(0)  # the date line, and the "Sincerely,"/name pair
+_REGULAR_SPACE_AFTER = Pt(10)  # role line, salutation, opening/closing paragraphs
+_BULLET_SPACE_AFTER = Pt(8)  # slightly tighter between the three bullets
+_BULLET_LEFT_INDENT = Inches(0.5)
+_BULLET_FIRST_LINE_INDENT = Inches(-0.25)  # hanging indent, so wrapped lines align under the text, not the bullet
 
 
-def _add_paragraph_with_markdown_bold(document: Document, text: str, alignment=None):
-    """Add a paragraph, rendering **bold** markdown spans as real bold runs.
+def _iter_bold_spans(text: str):
+    """Yield (chunk, is_bold) pairs from `text`, decoding two bold conventions.
 
-    The Generator's output uses **bold** markers for skill-paragraph
-    headers (per instructions.md's own format spec); python-docx has no
-    markdown awareness, so without this the literal asterisks would show
-    up in the saved file instead of actual bold text.
+    1. Literal **double-asterisk** markdown — the documented, intended
+       convention (see instructions.md) for bullet lead-in headers.
+    2. Unicode "styled" lookalike letters (see _STYLED_LETTER_RANGE) — a
+       fake-bold workaround observed from the model in practice. Since the
+       visual intent was clearly emphasis, these are decoded to plain
+       ASCII and rendered as real bold runs rather than left as garbled
+       glyphs that aren't actually bold once they reach Word.
+
+    Whichever convention (or neither) appears in a given stretch of text,
+    the caller gets back plain-ASCII chunks with a bold flag — never raw
+    markdown asterisks or styled Unicode glyphs.
     """
-    para = document.add_paragraph()
+    for is_styled, group in itertools.groupby(
+        text, key=lambda ch: ord(ch) in _STYLED_LETTER_RANGE
+    ):
+        chunk = "".join(group)
+        if is_styled:
+            yield unicodedata.normalize("NFKC", chunk), True
+            continue
+        pos = 0
+        for match in _BOLD_MARKDOWN_PATTERN.finditer(chunk):
+            if match.start() > pos:
+                yield chunk[pos : match.start()], False
+            yield match.group(1), True
+            pos = match.end()
+        if pos < len(chunk):
+            yield chunk[pos:], False
+
+
+def _strip_leading_bullet_marker(line: str) -> str:
+    """Remove a stray manual bullet marker some models add anyway.
+
+    instructions.md tells the model not to type "•"/"-"/"*" at the start
+    of a bullet line — the renderer adds a real bulleted-list marker
+    automatically — but this strips one defensively if it shows up.
+    Deliberately does not match "**" (markdown bold) or "--".
+    """
+    return _LEADING_BULLET_MARKER.sub("", line, count=1)
+
+
+def _is_bullet_line(line: str) -> bool:
+    """True if `line` looks like one of the three skill bullets.
+
+    Detected by whether it starts with a bolded lead-in header — either
+    literal **markdown** or the Unicode "styled" lookalike variant (see
+    _iter_bold_spans) — after stripping any stray manual bullet marker.
+    """
+    candidate = _strip_leading_bullet_marker(line)
+    if candidate.startswith("**"):
+        return True
+    return bool(candidate) and ord(candidate[0]) in _STYLED_LETTER_RANGE
+
+
+def _add_paragraph(
+    document: Document,
+    text: str,
+    *,
+    alignment=None,
+    style: str | None = None,
+    space_before=None,
+    space_after=None,
+    line_spacing: float | None = None,
+    left_indent=None,
+    first_line_indent=None,
+):
+    """Add a paragraph, decoding bold spans (see _iter_bold_spans) into real
+    bold runs and applying whichever direct paragraph formatting is given.
+
+    Direct paragraph formatting (space_before/after, line_spacing, indents)
+    always overrides whatever the named `style` would otherwise supply —
+    used here so bullet paragraphs can use Word's built-in "List Bullet"
+    style (for a real bulleted list, not a typed "•" character) while still
+    getting this letter format's specific spacing and hanging indent rather
+    than that style's own defaults.
+    """
+    para = document.add_paragraph(style=style) if style else document.add_paragraph()
     if alignment is not None:
         para.alignment = alignment
 
-    pos = 0
-    for match in _BOLD_PATTERN.finditer(text):
-        if match.start() > pos:
-            para.add_run(text[pos : match.start()])
-        bold_run = para.add_run(match.group(1))
-        bold_run.bold = True
-        pos = match.end()
-    if pos < len(text):
-        para.add_run(text[pos:])
+    pf = para.paragraph_format
+    if space_before is not None:
+        pf.space_before = space_before
+    if space_after is not None:
+        pf.space_after = space_after
+    if line_spacing is not None:
+        pf.line_spacing = line_spacing
+    if left_indent is not None:
+        pf.left_indent = left_indent
+    if first_line_indent is not None:
+        pf.first_line_indent = first_line_indent
+
+    for chunk, is_bold in _iter_bold_spans(text):
+        if not chunk:
+            continue
+        run = para.add_run(chunk)
+        if is_bold:
+            run.bold = True
 
     return para
 
@@ -99,14 +205,17 @@ def _add_header(
     github_url: str,
     portfolio_url: str,
 ) -> None:
-    """Add the centered name + contact-line header block to `document`."""
+    """Add the centered, bolded name + contact-line header block to `document`."""
     name_para = document.add_paragraph()
     name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_para.paragraph_format.space_after = Pt(3)
     name_run = name_para.add_run(full_name)
     name_run.font.size = Pt(15)
+    name_run.bold = True
 
     contact_para = document.add_paragraph()
     contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    contact_para.paragraph_format.space_after = Pt(12)
     contact_para.add_run(f"{location} | {phone} | {email} | ")
     _add_hyperlink(contact_para, linkedin_url, "LinkedIn")
     contact_para.add_run(" | ")
@@ -131,20 +240,37 @@ def write_docx(
 ) -> str:
     """Write `letter_text` to a .docx file in `output_dir`.
 
-    Produces a business-letter document: 1-inch margins, single-spaced
-    11pt Times New Roman body text, no header/footer section. `letter_text`
-    is split into left-aligned paragraphs on blank lines; any `**bold**`
-    markdown spans within a paragraph are rendered as real bold runs.
+    Produces a business-letter document: 1-inch margins, 11pt Times New
+    Roman body text, no header/footer section. `letter_text` is split into
+    one paragraph per non-empty line (splitting on ANY newline — the
+    Generator is instructed to blank-line-separate every logical block,
+    but in practice sometimes uses single newlines instead; splitting on
+    every line rather than only on blank-line-separated blocks handles
+    both without losing paragraph structure, since each logical block
+    the Generator writes is always exactly one line of text).
+
+    Each line is classified and formatted positionally:
+      - The first line (the date) and the last two lines ("Sincerely," and
+        the signed name) get tight spacing (no space after).
+      - A line that starts with a bolded lead-in header — real **markdown**
+        or a Unicode "styled" lookalike fake-bold (see _iter_bold_spans) —
+        is treated as one of the three skill bullets: rendered with Word's
+        real bulleted-list formatting (not a typed "•" character), a
+        hanging indent, and single line spacing.
+      - Every other line (role name, salutation, opening paragraph, closing
+        paragraph(s)) gets standard paragraph spacing.
+    Any bold spans within a line — **markdown** or Unicode fake-bold — are
+    rendered as real bold runs throughout, not just within bullets.
 
     If `full_name` is provided, a centered header is added above the body:
-    the name at 15pt, then a centered contact line at 11pt with LinkedIn/
-    GitHub/Portfolio rendered as black (non-default-blue) hyperlinks. Pass
-    `full_name` and the rest of the contact fields together, or omit all of
-    them to skip the header entirely (e.g. for tests).
+    the name at 15pt bold, then a centered contact line at 11pt with
+    LinkedIn/GitHub/Portfolio rendered as black (non-default-blue)
+    hyperlinks. Pass `full_name` and the rest of the contact fields
+    together, or omit all of them to skip the header entirely (e.g. for
+    tests).
 
     Args:
         letter_text: The final, reviewer-approved cover letter body text.
-            Paragraphs should be separated by a blank line.
         company: Company name, used to build the output filename.
         role: Role/job title, used to build the output filename.
         output_dir: Directory to write the .docx file into. Created if it
@@ -179,7 +305,7 @@ def write_docx(
     normal_style.font.size = Pt(11)
     normal_style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
     normal_style.paragraph_format.space_before = Pt(0)
-    normal_style.paragraph_format.space_after = Pt(12)
+    normal_style.paragraph_format.space_after = _REGULAR_SPACE_AFTER
 
     if full_name:
         _add_header(
@@ -193,12 +319,28 @@ def write_docx(
             portfolio_url=portfolio_url,
         )
 
-    paragraphs = re.split(r"\n\s*\n", letter_text.strip())
-    for para_text in paragraphs:
-        para_text = para_text.strip()
-        if para_text:
-            _add_paragraph_with_markdown_bold(
-                document, para_text, alignment=WD_ALIGN_PARAGRAPH.LEFT
+    lines = [line.strip() for line in letter_text.strip().splitlines() if line.strip()]
+
+    for i, line in enumerate(lines):
+        is_tight = i == 0 or i >= len(lines) - 2  # date line, or "Sincerely,"/name
+        if _is_bullet_line(line):
+            _add_paragraph(
+                document,
+                _strip_leading_bullet_marker(line),
+                alignment=WD_ALIGN_PARAGRAPH.LEFT,
+                style="List Bullet",
+                space_before=Pt(0),
+                space_after=_BULLET_SPACE_AFTER,
+                line_spacing=1.0,
+                left_indent=_BULLET_LEFT_INDENT,
+                first_line_indent=_BULLET_FIRST_LINE_INDENT,
+            )
+        else:
+            _add_paragraph(
+                document,
+                line,
+                alignment=WD_ALIGN_PARAGRAPH.LEFT,
+                space_after=_TIGHT_SPACE_AFTER if is_tight else _REGULAR_SPACE_AFTER,
             )
 
     document.save(str(filepath))
@@ -206,20 +348,23 @@ def write_docx(
 
 
 if __name__ == "__main__":
-    sample_letter = """Dear Recruiter,
+    sample_letter = """September 09, 2026
+
+Software Engineer, Test Company
+
+Dear Recruiter,
 
 My name is Jane Doe, and I am writing to express my interest in the Software Engineer position at Test Company. I am currently studying Computer Science, with a strong focus on distributed systems and developer tooling. I believe the following skills make me a strong fit for this role.
 
-**Backend Systems:** During my internship at a fintech startup, I designed and shipped a rate-limiting service that reduced downstream API errors by 40%, working primarily in Python and Go.
+**Backend Systems:** During my internship at a fintech startup, I designed and shipped a rate-limiting service that reduced downstream API errors by 40%, working primarily in Python and Go. I built the request-throttling logic on top of a Redis-backed token bucket, instrumented it with per-client metrics, and rolled it out gradually behind a feature flag to validate behavior under real traffic. This work directly translates to the kind of high-throughput backend reliability Test Company's platform team maintains.
 
-**Distributed Systems Coursework:** My graduate coursework in distributed systems covered consensus protocols, replication, and fault tolerance, which I applied in a course project building a Raft-based key-value store.
+**Distributed Systems Coursework:** My graduate coursework in distributed systems covered consensus protocols, replication, and fault tolerance, which I applied in a course project building a Raft-based key-value store in Go. I implemented leader election, log replication, and snapshotting, and stress-tested the cluster under simulated network partitions to confirm it preserved linearizability. That hands-on grounding in distributed correctness is exactly what I'd bring to Test Company's infrastructure team.
 
-**Open Source Contributions:** I have contributed several merged pull requests to a widely-used open-source observability tool, focused on improving its tracing instrumentation.
+**Open Source Contributions:** I have contributed several merged pull requests to a widely-used open-source observability tool, focused on improving its tracing instrumentation and reducing sampling overhead. Working across an unfamiliar, large codebase taught me to navigate other engineers' design decisions and communicate changes clearly through code review. I'm eager to bring that same collaborative, detail-oriented approach to Test Company's engineering culture.
 
 As for my interest in Test Company, it is deeply rooted in the company's engineering culture and its investment in developer tooling. I've followed the team's engineering blog closely and admire the emphasis on internal platform quality. I am enthusiastic about the possibility of bringing my skills to Test Company and look forward to discussing how my background and experience would allow me to contribute to the Platform team.
 
 Sincerely,
-
 Jane Doe"""
 
     saved_path = write_docx(
